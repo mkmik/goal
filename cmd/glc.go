@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/ast"
 	"log"
 )
 
@@ -14,13 +14,13 @@ type visitor struct {
 }
 
 func (v *visitor) Indent() {
-	for i:=0; i<v.depth;i++ {
+	for i := 0; i < v.depth; i++ {
 		fmt.Printf(" ")
 	}
 }
 
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
-	next := &visitor{v.depth+1}
+	next := &visitor{v.depth + 1}
 
 	if node != nil {
 		v.Indent()
@@ -38,20 +38,29 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 		case *ast.DeclStmt:
 			v.Indent()
 			fmt.Printf("DECL STMT %#v\n", n)
+		case *ast.AssignStmt:
+			v.Indent()
+			if n.Tok == token.DEFINE {
+				fmt.Printf("DEFINE ASSIGN STMT %#v\n", n)
+			} else {
+				fmt.Printf("PLAIN ASSIGN STMT %#v ... %#v\n", n, n.Lhs[0])
+			}
 		default:
 			fmt.Printf("-------- %#v\n", node)
 			return next
 		}
 	} else {
-//		fmt.Printf("popping\n")
+		//		fmt.Printf("popping\n")
 	}
 	return nil
 }
 
 func CompileFile(tree *ast.File) error {
-	fmt.Println("compiled", tree)
+	fmt.Printf("compiled %#v\n", tree)
 	v := &visitor{}
 	ast.Walk(v, tree)
+
+	DumpToFile(tree, "/tmp/ast")
 	return nil
 }
 
