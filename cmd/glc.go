@@ -181,6 +181,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		case *ast.AssignStmt:
 			if n.Tok == token.DEFINE {
 				fmt.Printf("DEFINE ASSIGN STMT %#v\n", n)
+				log.Fatalf("NOT IMPLEMENTED YET: type inference in var decl")
 			} else {
 				fmt.Printf("PLAIN ASSIGN STMT %#v ... %#v\n", n, n.Lhs[0])
 			}
