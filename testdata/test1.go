@@ -6,7 +6,7 @@ import (
 
 // main func
 func main() {
-	var x int = 1 + 2
+	var x error = 1 + 2
 	y := x * 13
 	y = y + 1
 

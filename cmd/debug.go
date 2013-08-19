@@ -40,3 +40,11 @@ func DumpToFile(tree ast.Node, fileName string) {
 func Dump(tree ast.Node, fileName string) {
 	ast.Walk(&dumper{out: os.Stdout}, tree)
 }
+
+func (s *Scope) DumpScope() {
+	fmt.Printf("Scope:\n")
+	for k, v := range s.Symbols {
+		fmt.Printf("%s : %#v\n", k, v)
+	}
+	fmt.Printf("end scope\n")
+}
