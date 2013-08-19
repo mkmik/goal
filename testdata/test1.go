@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func Test() int {
+func Test(a, b int8, c int) int {
 	return 10 + 2
 }
 

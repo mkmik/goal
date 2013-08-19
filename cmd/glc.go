@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/axw/gollvm/llvm"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -67,10 +68,12 @@ func NewScope(parent *Scope) Scope {
 
 type ModuleVisitor struct {
 	Scope
+	Module llvm.Module
 }
 
 // contains common state shared accross the function
 type FunctionVisitor struct {
+	Function llvm.Value
 }
 
 // contains scope local to a block
@@ -79,13 +82,34 @@ type BlockVisitor struct {
 	*FunctionVisitor
 }
 
+func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type, err error) {
+	for _, f := range fl.List {
+		t, err := s.ParseLlvmType(f.Type)
+		if err != nil {
+			return nil, err
+		}
+		args := make([]llvm.Type, len(f.Names))
+		for i := range f.Names {
+			args[i] = t
+		}
+		res = append(res, args...)
+	}
+	return
+}
+
 func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
 		case *ast.FuncDecl:
-			fmt.Printf("FUNC DECL %s: %#v\n", n.Name, n)
+			fmt.Printf("FUNC DECL %s: %#v\n", n.Name, n.Type)
+			func_args, err := v.ParseLlvmTypes(n.Type.Params)
+			if err != nil {
+				log.Fatal("Cannot convert to llvm types: ", err)
+			}
+			func_type := llvm.FunctionType(llvm.VoidType(), func_args, false)
+			backFunction := llvm.AddFunction(v.Module, n.Name.Name, func_type)
 			if n.Body != nil {
-				fv := &FunctionVisitor{}
+				fv := &FunctionVisitor{backFunction}
 				ast.Walk(&BlockVisitor{NewScope(&v.Scope), fv}, n.Body)
 			}
 			return nil
@@ -116,6 +140,34 @@ func (s *Scope) AddDecl(d ast.Decl) error {
 		}
 	}
 	return nil
+}
+
+func LlvmType(t Type) (llvm.Type, error) {
+	switch t := t.(type) {
+	case PrimitiveType:
+		switch t {
+		case Int:
+			return llvm.Int32Type(), nil
+		case Int8:
+			return llvm.Int8Type(), nil
+		case Int16:
+			return llvm.Int16Type(), nil
+		case Int32:
+			return llvm.Int32Type(), nil
+		default:
+			return llvm.Type{}, fmt.Errorf("Cannot translate primitive type %#v to llvm type", t)
+		}
+	default:
+		return llvm.Type{}, fmt.Errorf("Cannot translate type %#v to llvm type", t)
+	}
+}
+
+func (s *Scope) ParseLlvmType(typeName ast.Expr) (llvm.Type, error) {
+	t, err := s.ParseType(typeName)
+	if err != nil {
+		return llvm.Type{}, err
+	}
+	return LlvmType(t)
 }
 
 func (s *Scope) ParseType(typeName ast.Expr) (Type, error) {
@@ -200,8 +252,11 @@ func CompileFile(tree *ast.File) error {
 	DumpToFile(tree, "/tmp/ast")
 
 	fmt.Printf("compiling %#v\n", tree)
-	v := &ModuleVisitor{NewScope(nil)}
+	v := &ModuleVisitor{NewScope(nil), llvm.NewModule(tree.Name.Name)}
 	ast.Walk(v, tree)
+
+	fmt.Printf("LLVM: -----------\n")
+	v.Module.Dump()
 	return nil
 }
 
