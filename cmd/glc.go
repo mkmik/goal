@@ -61,12 +61,12 @@ type Scope struct {
 	Parent  *Scope
 }
 
-func NewScope(parent *Scope) *Scope {
-	return &Scope{map[string]Symbol{}, parent}
+func NewScope(parent *Scope) Scope {
+	return Scope{map[string]Symbol{}, parent}
 }
 
 type ModuleVisitor struct {
-	*Scope
+	Scope
 }
 
 // contains common state shared accross the function
@@ -75,7 +75,7 @@ type FunctionVisitor struct {
 
 // contains scope local to a block
 type BlockVisitor struct {
-	*Scope
+	Scope
 	*FunctionVisitor
 }
 
@@ -86,7 +86,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			fmt.Printf("FUNC DECL %s: %#v\n", n.Name, n)
 			if n.Body != nil {
 				fv := &FunctionVisitor{}
-				ast.Walk(&BlockVisitor{NewScope(v.Scope), fv}, n.Body)
+				ast.Walk(&BlockVisitor{NewScope(&v.Scope), fv}, n.Body)
 			}
 			return nil
 		case *ast.DeclStmt:
@@ -172,7 +172,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
 		case *ast.ExprStmt:
-			fmt.Printf("EXPR STATEMENT %#v\n", n)
+			log.Fatalf("NOT IMPLEMENTED YET: expression statements")
 		case *ast.DeclStmt:
 			err := v.AddDecl(n.Decl)
 			if err != nil {

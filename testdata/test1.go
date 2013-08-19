@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+func Test() int {
+	return 10 + 2
+}
+
 // main func
 func main() {
 	var x int = 1 + 2
@@ -11,5 +15,5 @@ func main() {
 	y = y + 1
 	x, y = y, x
 
-	fmt.Println(x, y)
+	//fmt.Println(x, y)
 }
