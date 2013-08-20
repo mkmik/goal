@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"log"
+	"strconv"
 )
 
 const (
@@ -38,8 +39,9 @@ type PrimitiveType uint
 // All concrete types embed ImplementsType which
 // ensures that all types implement the Type interface.
 type implementsType struct{}
+
 func (_ *implementsType) isType() {}
-func (_ PrimitiveType) isType() {}
+func (_ PrimitiveType) isType()   {}
 
 type MapType struct {
 	implementsType
@@ -83,12 +85,21 @@ type ModuleVisitor struct {
 // contains common state shared accross the function
 type FunctionVisitor struct {
 	Function llvm.Value
+	Builder  llvm.Builder
 }
 
 // contains scope local to a block
 type BlockVisitor struct {
 	Scope
 	*FunctionVisitor
+	Block llvm.BasicBlock
+}
+
+type ExpressionVisitor struct {
+	*BlockVisitor
+	// result of expression
+	Value llvm.Value
+	Type  Type
 }
 
 func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type, err error) {
@@ -101,7 +112,7 @@ func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type, err error) {
 			return nil, err
 		}
 		if f.Names == nil {
-			res=append(res, t)
+			res = append(res, t)
 		} else {
 			args := make([]llvm.Type, len(f.Names))
 			for i := range f.Names {
@@ -136,10 +147,16 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				func_ret_type = llvm.StructType(func_ret_types, false)
 			}
 			func_type := llvm.FunctionType(func_ret_type, func_arg_types, false)
-			backFunction := llvm.AddFunction(v.Module, n.Name.Name, func_type)
+			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, func_type)
 			if n.Body != nil {
-				fv := &FunctionVisitor{backFunction}
-				ast.Walk(&BlockVisitor{NewScope(&v.Scope), fv}, n.Body)
+				builder := llvm.NewBuilder()
+				defer builder.Dispose()
+
+				entry := llvm.AddBasicBlock(llvmFunction, "")
+				builder.SetInsertPointAtEnd(entry)
+
+				fv := &FunctionVisitor{llvmFunction, builder}
+				ast.Walk(&BlockVisitor{NewScope(&v.Scope), fv, entry}, n.Body)
 			}
 			return nil
 		case *ast.DeclStmt:
@@ -251,9 +268,49 @@ func (s *Scope) AddVar(name string, variable Variable) error {
 	return nil
 }
 
+func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
+	if node != nil {
+		switch n := node.(type) {
+		case *ast.BasicLit:
+			fmt.Printf("MY LITERAL: %#v\n", n)
+			llvmType, err := LlvmType(v.Type)
+			if err != nil {
+				log.Fatal(err)
+			}
+			val, err := strconv.ParseUint(n.Value, 10, 64)
+			if err != nil {
+				log.Fatal(err)
+			}
+			v.Value = llvm.ConstInt(llvmType, val, false)
+		default:
+			fmt.Printf("----- Function visitor: UNKNOWN %#v\n", node)
+			return v
+		}
+	}
+	return nil
+}
+
 func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
+		case *ast.ReturnStmt:
+			fmt.Printf("MY EXPR %#v\n", n.Results[0])
+			var err error
+			values := make([]llvm.Value, len(n.Results))
+			types := make([]llvm.Type, len(n.Results))
+			// TODO(mkm) fetch them from function delcaration
+			functionReturnTypes := []Type{Int64}
+			for i, e := range n.Results {
+				ev := &ExpressionVisitor{v, llvm.Value{}, functionReturnTypes[i]}
+				ast.Walk(ev, e)
+				values[i] = ev.Value
+				types[i], err = LlvmType(ev.Type)
+				if err != nil {
+					log.Fatal("evaluating return statement", err)
+				}
+			}
+			res := values[0]
+			v.Builder.CreateRet(res)
 		case *ast.ExprStmt:
 			log.Fatalf("NOT IMPLEMENTED YET: expression statements")
 		case *ast.DeclStmt:
@@ -276,7 +333,6 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		v.DumpScope()
 	}
 	return nil
-
 }
 
 func CompileFile(tree *ast.File) error {
