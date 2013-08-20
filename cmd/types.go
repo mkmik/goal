@@ -43,6 +43,12 @@ type SliceType struct {
 	Value Type
 }
 
+type FunctionType struct {
+	implementsType
+	Params []Type
+	Results []Type
+	// TODO(mkm) receivers
+}
 
 func (s *Scope) ParseType(typeName ast.Expr) (Type, error) {
 	switch t := typeName.(type) {
