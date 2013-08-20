@@ -14,6 +14,7 @@ import (
 type Symbol struct {
 	Name string
 	Type Type
+	Value llvm.Value
 }
 
 //
@@ -60,14 +61,8 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 		switch n := node.(type) {
 		case *ast.FuncDecl:
 			fmt.Printf("FUNC DECL %s: %#v\n", n.Name, n.Type)
-			func_arg_types, err := v.ParseLlvmTypes(n.Type.Params)
-			if err != nil {
-				log.Fatal("Cannot args convert to llvm types: ", err)
-			}
-			func_ret_types, err := v.ParseLlvmTypes(n.Type.Results)
-			if err != nil {
-				log.Fatal("Cannot return convert to llvm types: ", err)
-			}
+			func_arg_types := v.ParseLlvmTypes(n.Type.Params)
+			func_ret_types := v.ParseLlvmTypes(n.Type.Results)
 			var func_ret_type llvm.Type
 			switch len(func_ret_types) {
 			case 0:
@@ -109,10 +104,7 @@ func (s *Scope) AddDecl(d ast.Decl) error {
 		vs := sp.(*ast.ValueSpec)
 		for idx, n := range vs.Names {
 			fmt.Printf("----------------------- var %s %#v = %#v \n", n, vs.Type, vs.Values[idx])
-			typ, err := s.ParseType(vs.Type)
-			if err != nil {
-				return err
-			}
+			typ := s.ParseType(vs.Type)
 			s.AddVar(n.Name, Symbol{Name: n.Name, Type: typ})
 		}
 	}
@@ -151,10 +143,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			return nil
 		case *ast.BasicLit:
 			fmt.Printf("MY LITERAL: %#v\n", n)
-			llvmType, err := LlvmType(v.Type)
-			if err != nil {
-				log.Fatal(err)
-			}
+			llvmType := LlvmType(v.Type)
 			val, err := strconv.ParseUint(n.Value, 10, 64)
 			if err != nil {
 				log.Fatal(err)
@@ -177,7 +166,6 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		switch n := node.(type) {
 		case *ast.ReturnStmt:
 			fmt.Printf("MY EXPR %#v\n", n.Results[0])
-			var err error
 			values := make([]llvm.Value, len(n.Results))
 			types := make([]llvm.Type, len(n.Results))
 			// TODO(mkm) fetch them from function delcaration
@@ -186,10 +174,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				ev := &ExpressionVisitor{v, llvm.Value{}, functionReturnTypes[i]}
 				ast.Walk(ev, e)
 				values[i] = ev.Value
-				types[i], err = LlvmType(ev.Type)
-				if err != nil {
-					log.Fatal("evaluating return statement", err)
-				}
+				types[i] = LlvmType(ev.Type)
 			}
 			res := values[0]
 			v.Builder.CreateRet(res)

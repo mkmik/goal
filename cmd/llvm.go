@@ -3,49 +3,44 @@ package main
 import (
 	"github.com/axw/gollvm/llvm"
 	"go/ast"
-	"fmt"
+	"log"
 )
 
-func LlvmType(t Type) (llvm.Type, error) {
+func LlvmType(t Type) llvm.Type {
 	switch t := t.(type) {
 	case PrimitiveType:
 		switch t {
 		case Int:
-			return llvm.Int32Type(), nil
+			return llvm.Int32Type()
 		case Int8:
-			return llvm.Int8Type(), nil
+			return llvm.Int8Type()
 		case Int16:
-			return llvm.Int16Type(), nil
+			return llvm.Int16Type()
 		case Int32:
-			return llvm.Int32Type(), nil
+			return llvm.Int32Type()
 		case Int64:
-			return llvm.Int64Type(), nil
+			return llvm.Int64Type()
 		default:
-			return llvm.Type{}, fmt.Errorf("Cannot translate primitive type %#v to llvm type", t)
+			log.Fatalf("Cannot translate primitive type %#v to llvm type", t)
 		}
 	default:
-		return llvm.Type{}, fmt.Errorf("Cannot translate type %#v to llvm type", t)
+		log.Fatalf("Cannot translate type %#v to llvm type", t)
 	}
+	// unreachable
+	return llvm.Type{}
 }
 
-func (s *Scope) ParseLlvmType(typeName ast.Expr) (llvm.Type, error) {
-	t, err := s.ParseType(typeName)
-	if err != nil {
-		return llvm.Type{}, err
-	}
-	return LlvmType(t)
+func (s *Scope) ParseLlvmType(typeName ast.Expr) llvm.Type {
+	return LlvmType(s.ParseType(typeName))
 }
 
 
-func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type, err error) {
+func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type) {
 	if fl == nil {
-		return nil, nil
+		return nil
 	}
 	for _, f := range fl.List {
-		t, err := s.ParseLlvmType(f.Type)
-		if err != nil {
-			return nil, err
-		}
+		t := s.ParseLlvmType(f.Type)
 		if f.Names == nil {
 			res = append(res, t)
 		} else {
