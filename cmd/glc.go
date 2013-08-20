@@ -72,10 +72,15 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			default:
 				func_ret_type = llvm.StructType(func_ret_types, false)
 			}
-			func_type := llvm.FunctionType(func_ret_type, func_arg_types, false)
-			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, func_type)
+			llvm_func_type := llvm.FunctionType(func_ret_type, func_arg_types, false)
+			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, llvm_func_type)
 
-			v.AddVar(n.Name.Name, Symbol{Name: n.Name.Name, Type: v.ParseFuncType(n.Type), Value: llvmFunction})
+			functionType := v.ParseFuncType(n.Type)
+			v.AddVar(n.Name.Name, Symbol{Name: n.Name.Name, Type: functionType, Value: llvmFunction})
+			//TODO(mkm) add parameters to scope
+			//for i, t := functionType.ParamNames {
+			//
+			//}
 
 			if n.Body != nil {
 				builder := llvm.NewBuilder()
