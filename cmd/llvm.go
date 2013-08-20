@@ -34,7 +34,6 @@ func (s *Scope) ParseLlvmType(typeName ast.Expr) llvm.Type {
 	return LlvmType(s.ParseType(typeName))
 }
 
-
 func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type) {
 	if fl == nil {
 		return nil

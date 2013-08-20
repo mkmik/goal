@@ -29,8 +29,8 @@ type PrimitiveType uint
 // ensures that all types implement the Type interface.
 type implementsType struct{}
 
-func (_ *implementsType) isType() {}
-func (_ PrimitiveType) isType()   {}
+func (_ implementsType) isType() {}
+func (_ PrimitiveType) isType()  {}
 
 type MapType struct {
 	implementsType
@@ -45,7 +45,7 @@ type SliceType struct {
 
 type FunctionType struct {
 	implementsType
-	Params []Type
+	Params  []Type
 	Results []Type
 	// TODO(mkm) receivers
 }
@@ -92,4 +92,30 @@ func (s *Scope) ParseType(typeName ast.Expr) Type {
 	}
 	// unreachable
 	return nil
+}
+
+func (s *Scope) ParseTypes(fl *ast.FieldList) (res []Type) {
+	if fl == nil {
+		return nil
+	}
+	for _, f := range fl.List {
+		t := s.ParseType(f.Type)
+		if f.Names == nil {
+			res = append(res, t)
+		} else {
+			args := make([]Type, len(f.Names))
+			for i := range f.Names {
+				args[i] = t
+			}
+			res = append(res, args...)
+		}
+	}
+	return
+}
+
+func (s *Scope) ParseFuncType(ft *ast.FuncType) FunctionType {
+	return FunctionType{
+		Params:  s.ParseTypes(ft.Params),
+		Results: s.ParseTypes(ft.Results),
+	}
 }

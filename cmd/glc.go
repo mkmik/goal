@@ -12,8 +12,8 @@ import (
 )
 
 type Symbol struct {
-	Name string
-	Type Type
+	Name  string
+	Type  Type
 	Value llvm.Value
 }
 
@@ -74,6 +74,9 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 			func_type := llvm.FunctionType(func_ret_type, func_arg_types, false)
 			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, func_type)
+
+			v.AddVar(n.Name.Name, Symbol{Name: n.Name.Name, Type: v.ParseFuncType(n.Type), Value: llvmFunction})
+
 			if n.Body != nil {
 				builder := llvm.NewBuilder()
 				defer builder.Dispose()
@@ -111,7 +114,6 @@ func (s *Scope) AddDecl(d ast.Decl) error {
 	return nil
 }
 
-
 func (s *Scope) AddVar(name string, variable Symbol) error {
 	if _, ok := s.Symbols[name]; ok {
 		return fmt.Errorf("Multiple declarations of %s", name)
@@ -139,7 +141,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			default:
 				log.Fatalf("inimplemented binary operator %v", n.Op)
 			}
-			
+
 			return nil
 		case *ast.BasicLit:
 			fmt.Printf("MY LITERAL: %#v\n", n)
