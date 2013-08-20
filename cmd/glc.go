@@ -271,6 +271,24 @@ func (s *Scope) AddVar(name string, variable Variable) error {
 func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
+		case *ast.BinaryExpr:
+			fmt.Printf("MY BINARY: %#v\n", n.Y)
+			xev := *v
+			yev := *v
+			ast.Walk(&xev, n.X)
+			ast.Walk(&yev, n.Y)
+
+			// types must match, thus take either one
+			v.Type = xev.Type
+			switch n.Op {
+			case token.ADD:
+				fmt.Printf("MY ADDING!\n")
+				v.Value = v.Builder.CreateAdd(xev.Value, yev.Value, "")
+			default:
+				log.Fatalf("inimplemented binary operator %v", n.Op)
+			}
+			
+			return nil
 		case *ast.BasicLit:
 			fmt.Printf("MY LITERAL: %#v\n", n)
 			llvmType, err := LlvmType(v.Type)
@@ -282,8 +300,12 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				log.Fatal(err)
 			}
 			v.Value = llvm.ConstInt(llvmType, val, false)
+		case *ast.Ident:
+			fmt.Printf("MY EXPR IDENT: %#v\n", n)
+			v.Value = v.Function.Param(2)
+			return nil
 		default:
-			fmt.Printf("----- Function visitor: UNKNOWN %#v\n", node)
+			log.Fatalf("----- Function visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	}

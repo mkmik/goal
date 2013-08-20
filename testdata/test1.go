@@ -11,9 +11,9 @@ func TestY() (int8, int16) {
 }
 
 
-func Test(a, b int8, c int) int64 {
-	//return 10 + 2
-	return 42
+func Test(a, b int8, c int64) int64 {
+	return 10 + c
+	//return 42
 }
 
 // main func
