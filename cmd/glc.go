@@ -30,16 +30,25 @@ type Symbol interface {
 // types
 
 type Type interface {
+	isType()
 }
 
 type PrimitiveType uint
 
+// All concrete types embed ImplementsType which
+// ensures that all types implement the Type interface.
+type implementsType struct{}
+func (_ *implementsType) isType() {}
+func (_ PrimitiveType) isType() {}
+
 type MapType struct {
+	implementsType
 	Key   Type
 	Value Type
 }
 
 type SliceType struct {
+	implementsType
 	Value Type
 }
 
@@ -83,16 +92,23 @@ type BlockVisitor struct {
 }
 
 func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type, err error) {
+	if fl == nil {
+		return nil, nil
+	}
 	for _, f := range fl.List {
 		t, err := s.ParseLlvmType(f.Type)
 		if err != nil {
 			return nil, err
 		}
-		args := make([]llvm.Type, len(f.Names))
-		for i := range f.Names {
-			args[i] = t
+		if f.Names == nil {
+			res=append(res, t)
+		} else {
+			args := make([]llvm.Type, len(f.Names))
+			for i := range f.Names {
+				args[i] = t
+			}
+			res = append(res, args...)
 		}
-		res = append(res, args...)
 	}
 	return
 }
@@ -102,11 +118,24 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 		switch n := node.(type) {
 		case *ast.FuncDecl:
 			fmt.Printf("FUNC DECL %s: %#v\n", n.Name, n.Type)
-			func_args, err := v.ParseLlvmTypes(n.Type.Params)
+			func_arg_types, err := v.ParseLlvmTypes(n.Type.Params)
 			if err != nil {
-				log.Fatal("Cannot convert to llvm types: ", err)
+				log.Fatal("Cannot args convert to llvm types: ", err)
 			}
-			func_type := llvm.FunctionType(llvm.VoidType(), func_args, false)
+			func_ret_types, err := v.ParseLlvmTypes(n.Type.Results)
+			if err != nil {
+				log.Fatal("Cannot return convert to llvm types: ", err)
+			}
+			var func_ret_type llvm.Type
+			switch len(func_ret_types) {
+			case 0:
+				func_ret_type = llvm.VoidType()
+			case 1:
+				func_ret_type = func_ret_types[0]
+			default:
+				func_ret_type = llvm.StructType(func_ret_types, false)
+			}
+			func_type := llvm.FunctionType(func_ret_type, func_arg_types, false)
 			backFunction := llvm.AddFunction(v.Module, n.Name.Name, func_type)
 			if n.Body != nil {
 				fv := &FunctionVisitor{backFunction}
@@ -154,6 +183,8 @@ func LlvmType(t Type) (llvm.Type, error) {
 			return llvm.Int16Type(), nil
 		case Int32:
 			return llvm.Int32Type(), nil
+		case Int64:
+			return llvm.Int64Type(), nil
 		default:
 			return llvm.Type{}, fmt.Errorf("Cannot translate primitive type %#v to llvm type", t)
 		}
