@@ -198,7 +198,6 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 
 			return nil
 		case *ast.BasicLit:
-			fmt.Printf("MY LITERAL: %#v\n", n)
 			llvmType := LlvmType(v.Type)
 			val, err := strconv.ParseUint(n.Value, 10, 64)
 			if err != nil {
@@ -206,13 +205,32 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 			v.Value = llvm.ConstInt(llvmType, val, false)
 		case *ast.Ident:
-			fmt.Printf("MY EXPR IDENT: %#v\n", n)
 			symbol := v.ResolveSymbol(n.Name)
 			v.Type = symbol.Type
 			v.Value = *symbol.Value
 			return nil
+		case *ast.CallExpr:
+			fmt.Printf("MY EXPR CALL: %#v\n", n)
+			if id, ok := n.Fun.(*ast.Ident); ok {
+				if typ, err := v.ResolveType(id); err == nil {
+					fmt.Printf("MY EXPR TYPE CONVERSION: %#v, %#v\n", n, typ)
+					if len(n.Args) != 1 {
+						log.Fatalf("type conversion can have only one argument")
+					}
+					ev := *v
+					ast.Walk(&ev, n.Args[0])
+
+					// TODO(mkm) choose whether bitcast, trunc or sext
+					//v.Value = v.Builder.CreateBitCast(ev.Value, LlvmType(typ), "")
+					v.Value = v.Builder.CreateTrunc(ev.Value, LlvmType(typ), "")
+				} else {
+					fmt.Printf("MY NORMAL CALL %#v (err was: %v)\n", id, err)
+				}
+				return nil
+			}
+			log.Fatalf("Unimplemented call %#v", node)
 		default:
-			log.Fatalf("----- Function visitor: UNKNOWN %#v\n", node)
+			log.Fatalf("----- Expression visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	}
