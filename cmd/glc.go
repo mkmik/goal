@@ -14,7 +14,7 @@ import (
 type Symbol struct {
 	Name  string
 	Type  Type
-	Value llvm.Value
+	Value *llvm.Value
 }
 
 //
@@ -77,13 +77,20 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, llvm_func_type)
 
 			functionType := v.ParseFuncType(n.Type)
-			v.AddVar(n.Name.Name, Symbol{Name: n.Name.Name, Type: functionType, Value: llvmFunction})
+			err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: &llvmFunction})
+			if err != nil {
+				log.Fatalf("cannot add symbol %#v: %s", n.Name.Name, err)
+			}
 
 			newScope := NewScope(&v.Scope)
 			for i, p := range functionType.Params {
 				if p.Name != "" {
-					p.Value = llvmFunction.Param(i)
-					newScope.AddVar(p.Name, p)
+					value := llvmFunction.Param(i)
+					p.Value = &value
+					err := newScope.AddVar(p)
+					if err != nil {
+						log.Fatalf("cannot add symbol %#v: %s", p, err)
+					}
 				}
 			}
 
@@ -110,15 +117,24 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 	return nil
 }
 
-func (s *Scope) AddDecl(d ast.Decl) error {
+func (s *BlockVisitor) AddDecl(d ast.Decl) error {
+	fmt.Printf("MY adding decl %#v\n", d)
 	gen := d.(*ast.GenDecl)
 
 	for _, sp := range gen.Specs {
 		vs := sp.(*ast.ValueSpec)
 		for idx, n := range vs.Names {
-			fmt.Printf("----------------------- var %s %#v = %#v \n", n, vs.Type, vs.Values[idx])
 			typ := s.ParseType(vs.Type)
-			s.AddVar(n.Name, Symbol{Name: n.Name, Type: typ})
+			var value llvm.Value
+			if vs.Values != nil {
+				ev := &ExpressionVisitor{s, llvm.Value{}, typ}
+				ast.Walk(ev, vs.Values[idx])
+				value = ev.Value
+			}
+			err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: &value})
+			if err != nil {
+				log.Fatalf("cannot add var %s: %s", n.Name, err)
+			}
 		}
 	}
 	return nil
@@ -127,14 +143,19 @@ func (s *Scope) AddDecl(d ast.Decl) error {
 func (s *Scope) ResolveSymbol(name string) Symbol {
 	res, ok := s.Symbols[name]
 	if !ok {
-		log.Fatalf("cannot resolve symbol: %s", res)
+		log.Fatalf("cannot resolve symbol: %s", name)
 	}
 	return res
 }
 
-func (s *Scope) AddVar(name string, variable Symbol) error {
+func (s *Scope) AddVar(variable Symbol) error {
+	name := variable.Name
 	if _, ok := s.Symbols[name]; ok {
 		return fmt.Errorf("Multiple declarations of %s", name)
+	}
+	if variable.Value == nil {
+		value := llvm.ConstInt(LlvmType(variable.Type), 0, false)
+		variable.Value = &value
 	}
 	s.Symbols[name] = variable
 	return nil
@@ -146,7 +167,6 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 		case *ast.ParenExpr:
 			return v
 		case *ast.BinaryExpr:
-			fmt.Printf("MY BINARY: %#v\n", n.Y)
 			xev := *v
 			yev := *v
 			ast.Walk(&xev, n.X)
@@ -189,7 +209,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			fmt.Printf("MY EXPR IDENT: %#v\n", n)
 			symbol := v.ResolveSymbol(n.Name)
 			v.Type = symbol.Type
-			v.Value = symbol.Value
+			v.Value = *symbol.Value
 			return nil
 		default:
 			log.Fatalf("----- Function visitor: UNKNOWN %#v\n", node)
@@ -238,6 +258,24 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				log.Fatalf("NOT IMPLEMENTED YET: type inference in var decl")
 			} else {
 				fmt.Printf("PLAIN ASSIGN STMT %#v ... %#v\n", n, n.Lhs[0])
+				if len(n.Lhs) != len(n.Rhs) {
+					log.Fatalf("too many/too few expressions in assignment")
+				}
+
+				symbols := make([]Symbol, len(n.Lhs))
+				for i, e := range n.Lhs {
+					symbols[i] = v.ResolveSymbol(e.(*ast.Ident).Name)
+				}
+
+				values := make([]llvm.Value, len(n.Lhs))
+				for i, e := range n.Rhs {
+					ev := &ExpressionVisitor{v, llvm.Value{}, symbols[i].Type}
+					ast.Walk(ev, e)
+					values[i] = ev.Value
+				}
+				for i, sym := range symbols {
+					*sym.Value = values[i]
+				}
 			}
 		default:
 			fmt.Printf("----- Function visitor: UNKNOWN %#v\n", node)
