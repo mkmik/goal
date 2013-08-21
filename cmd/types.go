@@ -3,6 +3,7 @@ package main
 import (
 	"go/ast"
 	"log"
+	"fmt"
 )
 
 const (
@@ -51,47 +52,55 @@ type FunctionType struct {
 }
 
 func (s *Scope) ParseType(typeName ast.Expr) Type {
+	res, err := s.ResolveType(typeName)
+	if err!= nil {
+		log.Fatalf("%s", err)
+	}
+	return res
+}
+
+func (s *Scope) ResolveType(typeName ast.Expr) (Type, error) {
 	switch t := typeName.(type) {
 	case *ast.Ident:
 		switch t.Name {
 		case "int":
-			return Int
+			return Int, nil
 		case "int8":
-			return Int8
+			return Int8, nil
 		case "int16":
-			return Int16
+			return Int16, nil
 		case "int32":
-			return Int32
+			return Int32, nil
 		case "int64":
-			return Int64
+			return Int64, nil
 		case "uint8":
-			return Int8
+			return Int8, nil
 		case "uint16":
-			return Int16
+			return Int16, nil
 		case "uint32":
-			return Int32
+			return Int32, nil
 		case "uint64":
-			return Int64
+			return Int64, nil
 		case "string":
-			return String
+			return String, nil
 		case "error":
-			return Error
+			return Error, nil
 		default:
-			log.Fatalf("unknown type: %s", t)
+			return nil, fmt.Errorf("unknown type: %s", t)
 		}
 	case *ast.SelectorExpr:
-		log.Fatalf("NOT IMPLEMENTED YET: qualified type names")
+		return nil, fmt.Errorf("NOT IMPLEMENTED YET: qualified type names")
 	case *ast.MapType:
-		log.Fatalf("NOT IMPLEMENTED YET: map type")
+		return nil, fmt.Errorf("NOT IMPLEMENTED YET: map type")
 	case *ast.ArrayType:
-		log.Fatalf("NOT IMPLEMENTED YET: array type")
+		return nil, fmt.Errorf("NOT IMPLEMENTED YET: array type")
 	case *ast.ChanType:
-		log.Fatalf("NOT IMPLEMENTED YET: chan type")
+		return nil, fmt.Errorf("NOT IMPLEMENTED YET: chan type")
 	default:
-		log.Fatalf("unknown type class: %#v", typeName)
+		return nil, fmt.Errorf("unknown type class: %#v", typeName)
 	}
 	// unreachable
-	return nil
+	return nil, nil
 }
 
 func (s *Scope) ParseSymbols(fl *ast.FieldList) (res []Symbol) {

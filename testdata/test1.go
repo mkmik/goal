@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+//	"fmt"
 )
 
 /*
@@ -12,10 +12,13 @@ func TestY() (int8, int16) {
 }
 */
 
-func Test(a, b int32, c int32) int32 {
-	var aa, bc int32 = b*c, a
+func Test(a, b int32, c int64) int32 {
+	var aa, bc int32 = b*int32(c), a
 	aa, bc = bc, aa
 	return (aa + bc / a) % a
+}
+
+func main() {
 }
 
 /*
