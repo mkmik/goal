@@ -77,10 +77,14 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 
 			functionType := v.ParseFuncType(n.Type)
 			v.AddVar(n.Name.Name, Symbol{Name: n.Name.Name, Type: functionType, Value: llvmFunction})
-			//TODO(mkm) add parameters to scope
-			//for i, t := functionType.ParamNames {
-			//
-			//}
+
+			newScope := NewScope(&v.Scope)
+			for i, p := range functionType.Params {
+				if p.Name != "" {
+					p.Value = llvmFunction.Param(i)
+					newScope.AddVar(p.Name, p)
+				}
+			}
 
 			if n.Body != nil {
 				builder := llvm.NewBuilder()
@@ -90,7 +94,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				builder.SetInsertPointAtEnd(entry)
 
 				fv := &FunctionVisitor{llvmFunction, builder}
-				ast.Walk(&BlockVisitor{NewScope(&v.Scope), fv, entry}, n.Body)
+				ast.Walk(&BlockVisitor{newScope, fv, entry}, n.Body)
 			}
 			return nil
 		case *ast.DeclStmt:
@@ -119,6 +123,14 @@ func (s *Scope) AddDecl(d ast.Decl) error {
 	return nil
 }
 
+func (s *Scope) ResolveSymbol(name string) Symbol {
+	res, ok := s.Symbols[name]
+	if !ok {
+		log.Fatalf("cannot resolve symbol: %s", res)
+	}
+	return res
+}
+
 func (s *Scope) AddVar(name string, variable Symbol) error {
 	if _, ok := s.Symbols[name]; ok {
 		return fmt.Errorf("Multiple declarations of %s", name)
@@ -130,6 +142,8 @@ func (s *Scope) AddVar(name string, variable Symbol) error {
 func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
+		case *ast.ParenExpr:
+			return v
 		case *ast.BinaryExpr:
 			fmt.Printf("MY BINARY: %#v\n", n.Y)
 			xev := *v
@@ -137,12 +151,22 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			ast.Walk(&xev, n.X)
 			ast.Walk(&yev, n.Y)
 
+			if xev.Type != yev.Type {
+				log.Fatalf("Types %#v and %#v are not compatible", xev.Type, yev.Type)
+			}
 			// types must match, thus take either one
 			v.Type = xev.Type
 			switch n.Op {
 			case token.ADD:
-				fmt.Printf("MY ADDING!\n")
 				v.Value = v.Builder.CreateAdd(xev.Value, yev.Value, "")
+			case token.SUB:
+				v.Value = v.Builder.CreateSub(xev.Value, yev.Value, "")
+			case token.MUL:
+				v.Value = v.Builder.CreateMul(xev.Value, yev.Value, "")
+			case token.QUO:
+				v.Value = v.Builder.CreateSDiv(xev.Value, yev.Value, "")
+			case token.REM:
+				v.Value = v.Builder.CreateSRem(xev.Value, yev.Value, "")
 			default:
 				log.Fatalf("inimplemented binary operator %v", n.Op)
 			}
@@ -158,7 +182,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			v.Value = llvm.ConstInt(llvmType, val, false)
 		case *ast.Ident:
 			fmt.Printf("MY EXPR IDENT: %#v\n", n)
-			v.Value = v.Function.Param(2)
+			v.Value = v.ResolveSymbol(n.Name).Value
 			return nil
 		default:
 			log.Fatalf("----- Function visitor: UNKNOWN %#v\n", node)

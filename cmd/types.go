@@ -45,8 +45,8 @@ type SliceType struct {
 
 type FunctionType struct {
 	implementsType
-	Params  []Type
-	Results []Type
+	Params  []Symbol
+	Results []Symbol
 	// TODO(mkm) receivers
 }
 
@@ -94,18 +94,18 @@ func (s *Scope) ParseType(typeName ast.Expr) Type {
 	return nil
 }
 
-func (s *Scope) ParseTypes(fl *ast.FieldList) (res []Type) {
+func (s *Scope) ParseSymbols(fl *ast.FieldList) (res []Symbol) {
 	if fl == nil {
 		return nil
 	}
 	for _, f := range fl.List {
 		t := s.ParseType(f.Type)
 		if f.Names == nil {
-			res = append(res, t)
+			res = append(res, Symbol{Name: "", Type: t})
 		} else {
-			args := make([]Type, len(f.Names))
-			for i := range f.Names {
-				args[i] = t
+			args := make([]Symbol, len(f.Names))
+			for i, n := range f.Names {
+				args[i] = Symbol{Name: n.Name, Type: t}
 			}
 			res = append(res, args...)
 		}
@@ -113,9 +113,16 @@ func (s *Scope) ParseTypes(fl *ast.FieldList) (res []Type) {
 	return
 }
 
+func (s *Scope) ParseTypes(fl *ast.FieldList) (types []Type) {
+	for _, s := range s.ParseSymbols(fl) {
+		types = append(types, s.Type)
+	}
+	return
+}
+
 func (s *Scope) ParseFuncType(ft *ast.FuncType) FunctionType {
 	return FunctionType{
-		Params:  s.ParseTypes(ft.Params),
-		Results: s.ParseTypes(ft.Results),
+		Params:  s.ParseSymbols(ft.Params),
+		Results: s.ParseSymbols(ft.Results),
 	}
 }
