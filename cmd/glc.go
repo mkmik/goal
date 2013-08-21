@@ -167,10 +167,8 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 		case *ast.ParenExpr:
 			return v
 		case *ast.BinaryExpr:
-			xev := *v
-			yev := *v
-			ast.Walk(&xev, n.X)
-			ast.Walk(&yev, n.Y)
+			xev := v.Evaluate(n.X)
+			yev := v.Evaluate(n.Y)
 
 			if xev.Type != yev.Type {
 				log.Fatalf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
@@ -217,9 +215,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 					if len(n.Args) != 1 {
 						log.Fatalf("type conversion can have only one argument")
 					}
-					ev := *v
-					ast.Walk(&ev, n.Args[0])
-
+					ev := v.Evaluate(n.Args[0])
 					// TODO(mkm) choose whether bitcast, trunc or sext
 					//v.Value = v.Builder.CreateBitCast(ev.Value, LlvmType(typ), "")
 					v.Value = v.Builder.CreateTrunc(ev.Value, LlvmType(typ), "")
@@ -235,6 +231,12 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 	}
 	return nil
+}
+
+func (v *ExpressionVisitor) Evaluate(exp ast.Expr) *ExpressionVisitor {
+	ev := *v
+	ast.Walk(&ev, exp)
+	return &ev
 }
 
 func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
