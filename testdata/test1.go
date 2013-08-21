@@ -11,7 +11,7 @@ func TestY() (int8, int16) {
 }
 
 
-func Test(a, b int64, c int64) int64 {
+func Test(a, b int8, c int8) int8 {
 	return (a + b * c / a) % a
 	//return 42
 }

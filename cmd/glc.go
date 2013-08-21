@@ -38,8 +38,9 @@ type ModuleVisitor struct {
 
 // contains common state shared accross the function
 type FunctionVisitor struct {
-	Function llvm.Value
-	Builder  llvm.Builder
+	FunctionType FunctionType
+	Function     llvm.Value
+	Builder      llvm.Builder
 }
 
 // contains scope local to a block
@@ -93,7 +94,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				entry := llvm.AddBasicBlock(llvmFunction, "")
 				builder.SetInsertPointAtEnd(entry)
 
-				fv := &FunctionVisitor{llvmFunction, builder}
+				fv := &FunctionVisitor{functionType, llvmFunction, builder}
 				ast.Walk(&BlockVisitor{newScope, fv, entry}, n.Body)
 			}
 			return nil
@@ -152,7 +153,11 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			ast.Walk(&yev, n.Y)
 
 			if xev.Type != yev.Type {
-				log.Fatalf("Types %#v and %#v are not compatible", xev.Type, yev.Type)
+				log.Fatalf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
+			} else if v.Type != xev.Type {
+				log.Fatalf("Types %#v and %#v are not compatible (B)", v.Type, xev.Type)
+			} else {
+				fmt.Printf("MY BINARY TYPES: %#v, %#v, %#v\n", v.Type, xev.Type, yev.Type)
 			}
 			// types must match, thus take either one
 			v.Type = xev.Type
@@ -182,7 +187,9 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			v.Value = llvm.ConstInt(llvmType, val, false)
 		case *ast.Ident:
 			fmt.Printf("MY EXPR IDENT: %#v\n", n)
-			v.Value = v.ResolveSymbol(n.Name).Value
+			symbol := v.ResolveSymbol(n.Name)
+			v.Type = symbol.Type
+			v.Value = symbol.Value
 			return nil
 		default:
 			log.Fatalf("----- Function visitor: UNKNOWN %#v\n", node)
@@ -196,18 +203,28 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
 		case *ast.ReturnStmt:
-			fmt.Printf("MY EXPR %#v\n", n.Results[0])
+			functionReturnSymbols := v.FunctionType.Results
+			if len(functionReturnSymbols) != len(n.Results) {
+				log.Fatalf("too many/too few arguments to return")
+			}
+
 			values := make([]llvm.Value, len(n.Results))
 			types := make([]llvm.Type, len(n.Results))
-			// TODO(mkm) fetch them from function delcaration
-			functionReturnTypes := []Type{Int64}
+
 			for i, e := range n.Results {
-				ev := &ExpressionVisitor{v, llvm.Value{}, functionReturnTypes[i]}
+				ev := &ExpressionVisitor{v, llvm.Value{}, functionReturnSymbols[i].Type}
 				ast.Walk(ev, e)
 				values[i] = ev.Value
 				types[i] = LlvmType(ev.Type)
 			}
-			res := values[0]
+
+			var res llvm.Value
+			switch len(values) {
+			case 1:
+				res = values[0]
+			default:
+				log.Fatalf("unimplemented multiple return values")
+			}
 			v.Builder.CreateRet(res)
 		case *ast.ExprStmt:
 			log.Fatalf("NOT IMPLEMENTED YET: expression statements")
