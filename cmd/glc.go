@@ -218,7 +218,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 					ev := v.Evaluate(n.Args[0])
 					// TODO(mkm) choose whether bitcast, trunc or sext
 					//v.Value = v.Builder.CreateBitCast(ev.Value, LlvmType(typ), "")
-					v.Value = v.Builder.CreateTrunc(ev.Value, LlvmType(typ), "")
+					v.Value = v.Builder.CreateIntCast(ev.Value, LlvmType(typ), "")
 				} else {
 					fmt.Printf("MY NORMAL CALL %#v (err was: %v)\n", id, err)
 				}
