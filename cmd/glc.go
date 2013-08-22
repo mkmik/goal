@@ -52,6 +52,14 @@ type Visitor interface {
 	Visit(ast.Node) ast.Visitor
 }
 
+type SkipRoot struct {
+	Visitor
+}
+
+func (s SkipRoot) Visit(ast.Node) ast.Visitor {
+	return s.Visitor
+}
+
 func Walk(visitor Visitor, node ast.Node) {
 	ast.Walk(EHV{visitor}, node)
 }
@@ -135,10 +143,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 
 				fv := &FunctionVisitor{v, nil, functionType, llvmFunction, builder}
 				bv := &BlockVisitor{newScope, fv, entry}
-				// TODO(mkm) any better way to skip visiting the top level element?
-				for _, stmt := range n.Body.List {
-					Walk(bv, stmt)
-				}
+				Walk(SkipRoot{bv}, n.Body)
 			}
 			return nil
 		case *ast.DeclStmt:
