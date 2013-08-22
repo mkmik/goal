@@ -9,6 +9,14 @@ func (s *Scope) ParseLlvmType(typeName ast.Expr) llvm.Type {
 	return s.ParseType(typeName).LlvmType()
 }
 
+func SymbolsToLlvmTypes(ss []Symbol) (res []llvm.Type) {
+	for _, s := range ss {
+		res = append(res, s.LlvmType())
+	}
+	return
+}
+
+
 func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type) {
 	if fl == nil {
 		return nil

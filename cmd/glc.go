@@ -16,6 +16,10 @@ type Symbol struct {
 	Value *llvm.Value
 }
 
+func (s Symbol) LlvmType() llvm.Type {
+	return s.Type.LlvmType()
+}
+
 //
 type SymbolMap map[string]Symbol
 
@@ -61,21 +65,8 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 		switch n := node.(type) {
 		case *ast.FuncDecl:
 			fmt.Printf("FUNC DECL %s: %#v\n", n.Name, n.Type)
-			func_arg_types := v.ParseLlvmTypes(n.Type.Params)
-			func_ret_types := v.ParseLlvmTypes(n.Type.Results)
-			var func_ret_type llvm.Type
-			switch len(func_ret_types) {
-			case 0:
-				func_ret_type = llvm.VoidType()
-			case 1:
-				func_ret_type = func_ret_types[0]
-			default:
-				func_ret_type = llvm.StructType(func_ret_types, false)
-			}
-			llvm_func_type := llvm.FunctionType(func_ret_type, func_arg_types, false)
-			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, llvm_func_type)
-
 			functionType := v.ParseFuncType(n.Type)
+			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, functionType.LlvmType())
 			if err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: &llvmFunction}); err != nil {
 				log.Fatalf("cannot add symbol %#v: %s", n.Name.Name, err)
 			}

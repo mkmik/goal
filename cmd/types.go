@@ -70,10 +70,6 @@ type FunctionType struct {
 	// TODO(mkm) receivers
 }
 
-func (b FunctionType) LlvmType() llvm.Type {
-	return llvm.PointerType(llvm.Int8Type(), 0)
-}
-
 func (s *Scope) ParseType(typeName ast.Expr) Type {
 	res, err := s.ResolveType(typeName)
 	if err != nil {
@@ -158,3 +154,20 @@ func (s *Scope) ParseFuncType(ft *ast.FuncType) FunctionType {
 		Results: s.ParseSymbols(ft.Results),
 	}
 }
+
+func (t FunctionType) LlvmType() llvm.Type {
+	func_arg_types := SymbolsToLlvmTypes(t.Params)
+	func_ret_types := SymbolsToLlvmTypes(t.Results)
+
+	var func_ret_type llvm.Type
+	switch len(func_ret_types) {
+	case 0:
+		func_ret_type = llvm.VoidType()
+	case 1:
+		func_ret_type = func_ret_types[0]
+	default:
+		func_ret_type = llvm.StructType(func_ret_types, false)
+	}
+	return llvm.FunctionType(func_ret_type, func_arg_types, false)
+}
+
