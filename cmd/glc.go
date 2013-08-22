@@ -76,8 +76,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, llvm_func_type)
 
 			functionType := v.ParseFuncType(n.Type)
-			err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: &llvmFunction})
-			if err != nil {
+			if err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: &llvmFunction}); err != nil {
 				log.Fatalf("cannot add symbol %#v: %s", n.Name.Name, err)
 			}
 
@@ -86,8 +85,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				if p.Name != "" {
 					value := llvmFunction.Param(i)
 					p.Value = &value
-					err := newScope.AddVar(p)
-					if err != nil {
+					if err := newScope.AddVar(p); err != nil {
 						log.Fatalf("cannot add symbol %#v: %s", p, err)
 					}
 				}
@@ -130,8 +128,7 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 				ast.Walk(ev, vs.Values[idx])
 				value = ev.Value
 			}
-			err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: &value})
-			if err != nil {
+			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: &value}); err != nil {
 				log.Fatalf("cannot add var %s: %s", n.Name, err)
 			}
 		}
@@ -153,7 +150,7 @@ func (s *Scope) AddVar(variable Symbol) error {
 		return fmt.Errorf("Multiple declarations of %s", name)
 	}
 	if variable.Value == nil {
-		value := llvm.ConstInt(LlvmType(variable.Type), 0, false)
+		value := llvm.ConstInt(variable.Type.LlvmType(), 0, false)
 		variable.Value = &value
 	}
 	s.Symbols[name] = variable
@@ -195,7 +192,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 
 			return nil
 		case *ast.BasicLit:
-			v.Value = llvm.ConstIntFromString(LlvmType(v.Type), n.Value, 10)
+			v.Value = llvm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
 		case *ast.Ident:
 			symbol := v.ResolveSymbol(n.Name)
 			v.Type = symbol.Type
@@ -212,7 +209,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 					ev := v.Evaluate(n.Args[0])
 					// TODO(mkm) choose whether bitcast, trunc or sext
 					//v.Value = v.Builder.CreateBitCast(ev.Value, LlvmType(typ), "")
-					v.Value = v.Builder.CreateIntCast(ev.Value, LlvmType(typ), "")
+					v.Value = v.Builder.CreateIntCast(ev.Value, typ.LlvmType(), "")
 				} else {
 					fmt.Printf("MY NORMAL CALL %#v (err was: %v)\n", id, err)
 				}
@@ -249,7 +246,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				ev := &ExpressionVisitor{v, llvm.Value{}, functionReturnSymbols[i].Type}
 				ast.Walk(ev, e)
 				values[i] = ev.Value
-				types[i] = LlvmType(ev.Type)
+				types[i] = ev.Type.LlvmType()
 			}
 
 			var res llvm.Value
@@ -333,8 +330,7 @@ func main() {
 	fmt.Println("test", files)
 
 	for _, name := range files {
-		err := OpenAndCompileFile(name)
-		if err != nil {
+		if err := OpenAndCompileFile(name); err != nil {
 			log.Fatal("Error compiling", err)
 		}
 	}
