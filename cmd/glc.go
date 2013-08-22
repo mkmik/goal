@@ -257,8 +257,6 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 						Perrorf("type conversion can have only one argument")
 					}
 					ev := v.Evaluate(n.Args[0])
-					// TODO(mkm) choose whether bitcast, trunc or sext
-					//v.Value = v.Builder.CreateBitCast(ev.Value, LlvmType(typ), "")
 					v.Value = v.Builder.CreateIntCast(ev.Value, typ.LlvmType(), "")
 				} else {
 					Perrorf("UNIMPLEMENTED FUNCTION CALL %#v (err was: %v)\n", id, err)
