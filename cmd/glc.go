@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"log"
+	"os"
 )
 
 type Symbol struct {
@@ -43,7 +44,23 @@ func Walk(visitor ast.Visitor, node ast.Node) {
 }
 
 func (v EHV) Visit(node ast.Node) ast.Visitor {
-	return v.Visitor.Visit(node)
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Fprintf(os.Stderr, "%s:%d: %s\n", "dummy.go", node.Pos(), err)
+			os.Exit(1)
+		}
+	}()
+	res := v.Visitor.Visit(node)
+	if res != nil {
+		return EHV{res}
+	} else {
+		return nil
+	}
+}
+
+func Perrorf(format string, args ...interface{}) {
+	panic(fmt.Errorf(format, args...))
+	//	log.Fatalf(format, args...)
 }
 
 type ModuleVisitor struct {
@@ -80,7 +97,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			functionType := v.ParseFuncType(n.Type)
 			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, functionType.LlvmType())
 			if err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: &llvmFunction}); err != nil {
-				log.Fatalf("cannot add symbol %#v: %s", n.Name.Name, err)
+				Perrorf("cannot add symbol %#v: %s", n.Name.Name, err)
 			}
 
 			newScope := NewScope(&v.Scope)
@@ -89,7 +106,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 					value := llvmFunction.Param(i)
 					p.Value = &value
 					if err := newScope.AddVar(p); err != nil {
-						log.Fatalf("cannot add symbol %#v: %s", p, err)
+						Perrorf("cannot add symbol %#v: %s", p, err)
 					}
 				}
 			}
@@ -132,7 +149,7 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 				value = ev.Value
 			}
 			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: &value}); err != nil {
-				log.Fatalf("cannot add var %s: %s", n.Name, err)
+				Perrorf("cannot add var %s: %s", n.Name, err)
 			}
 		}
 	}
@@ -142,7 +159,7 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 func (s *Scope) ResolveSymbol(name string) Symbol {
 	res, ok := s.Symbols[name]
 	if !ok {
-		log.Fatalf("cannot resolve symbol: %s", name)
+		Perrorf("cannot resolve symbol: %s", name)
 	}
 	return res
 }
@@ -170,9 +187,9 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			yev := v.Evaluate(n.Y)
 
 			if xev.Type != yev.Type {
-				log.Fatalf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
+				Perrorf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
 			} else if v.Type != xev.Type {
-				log.Fatalf("Types %#v and %#v are not compatible (B)", v.Type, xev.Type)
+				Perrorf("Types %#v and %#v are not compatible (B)", v.Type, xev.Type)
 			} else {
 				fmt.Printf("MY BINARY TYPES: %#v, %#v, %#v\n", v.Type, xev.Type, yev.Type)
 			}
@@ -190,7 +207,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			case token.REM:
 				v.Value = v.Builder.CreateSRem(xev.Value, yev.Value, "")
 			default:
-				log.Fatalf("inimplemented binary operator %v", n.Op)
+				Perrorf("inimplemented binary operator %v", n.Op)
 			}
 
 			return nil
@@ -207,7 +224,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				if typ, err := v.ResolveType(id); err == nil {
 					fmt.Printf("MY EXPR TYPE CONVERSION: %#v, %#v\n", n, typ)
 					if len(n.Args) != 1 {
-						log.Fatalf("type conversion can have only one argument")
+						Perrorf("type conversion can have only one argument")
 					}
 					ev := v.Evaluate(n.Args[0])
 					// TODO(mkm) choose whether bitcast, trunc or sext
@@ -218,9 +235,9 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				}
 				return nil
 			}
-			log.Fatalf("Unimplemented call %#v", node)
+			Perrorf("Unimplemented call %#v", node)
 		default:
-			log.Fatalf("----- Expression visitor: UNKNOWN %#v\n", node)
+			Perrorf("----- Expression visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	}
@@ -239,7 +256,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		case *ast.ReturnStmt:
 			functionReturnSymbols := v.FunctionType.Results
 			if len(functionReturnSymbols) != len(n.Results) {
-				log.Fatalf("too many/too few arguments to return")
+				Perrorf("too many/too few arguments to return")
 			}
 
 			values := make([]llvm.Value, len(n.Results))
@@ -257,11 +274,11 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			case 1:
 				res = values[0]
 			default:
-				log.Fatalf("unimplemented multiple return values")
+				Perrorf("unimplemented multiple return values")
 			}
 			v.Builder.CreateRet(res)
 		case *ast.ExprStmt:
-			log.Fatalf("NOT IMPLEMENTED YET: expression statements")
+			Perrorf("NOT IMPLEMENTED YET: expression statements")
 		case *ast.DeclStmt:
 			err := v.AddDecl(n.Decl)
 			if err != nil {
@@ -269,11 +286,11 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		case *ast.AssignStmt:
 			if n.Tok == token.DEFINE {
-				log.Fatalf("NOT IMPLEMENTED YET: type inference in var decl")
+				Perrorf("NOT IMPLEMENTED YET: type inference in var decl")
 			} else {
 				fmt.Printf("PLAIN ASSIGN STMT %#v ... %#v\n", n, n.Lhs[0])
 				if len(n.Lhs) != len(n.Rhs) {
-					log.Fatalf("too many/too few expressions in assignment")
+					Perrorf("too many/too few expressions in assignment")
 				}
 
 				symbols := make([]Symbol, len(n.Lhs))
