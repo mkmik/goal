@@ -1,59 +1,82 @@
 package main
 
 import (
+	"fmt"
+	"github.com/axw/gollvm/llvm"
 	"go/ast"
 	"log"
-	"fmt"
 )
 
-const (
-	Int PrimitiveType = iota
-	Int8
-	Int16
-	Int32
-	Int64
-	Uint8
-	Uint16
-	Uint32
-	Uint64
-	String
-	Error // TODO(mkm) should be builtin interface type
+var (
+	PointerSize = 8
+)
+
+var (
+	Int    = PrimitiveType{"int", true, llvm.Int32Type()}
+	Int8   = PrimitiveType{"int8", true, llvm.Int8Type()}
+	Int16  = PrimitiveType{"int16", true, llvm.Int16Type()}
+	Int32  = PrimitiveType{"int32", true, llvm.Int32Type()}
+	Int64  = PrimitiveType{"int64", true, llvm.Int64Type()}
+	Uint   = PrimitiveType{"int", false, llvm.Int32Type()}
+	Uint8  = PrimitiveType{"int8", false, llvm.Int8Type()}
+	Uint16 = PrimitiveType{"int16", false, llvm.Int16Type()}
+	Uint32 = PrimitiveType{"int32", false, llvm.Int32Type()}
+	Uint64 = PrimitiveType{"int64", false, llvm.Int64Type()}
+	Bool   = PrimitiveType{"bool", false, llvm.Int1Type()}
+	String = PrimitiveType{"string", false, llvm.PointerType(llvm.Int8Type(), 0)}
+	// TODO(mkm): should be an interface type
+	Error = PrimitiveType{"error", false, llvm.PointerType(llvm.Int8Type(), 0)}
 )
 
 type Type interface {
-	isType()
+	LlvmType() llvm.Type
 }
 
-type PrimitiveType uint
+type IntegerType interface {
+	Size() int
+}
 
-// All concrete types embed ImplementsType which
-// ensures that all types implement the Type interface.
-type implementsType struct{}
+type PrimitiveType struct {
+	Name     string
+	Signed   bool
+	llvmType llvm.Type
+}
 
-func (_ implementsType) isType() {}
-func (_ PrimitiveType) isType()  {}
+func (b PrimitiveType) LlvmType() llvm.Type {
+	return b.llvmType
+}
 
 type MapType struct {
-	implementsType
 	Key   Type
 	Value Type
 }
 
+func (b MapType) LlvmType() llvm.Type {
+	return llvm.PointerType(llvm.Int8Type(), 0)
+}
+
 type SliceType struct {
-	implementsType
 	Value Type
 }
 
+func (b SliceType) LlvmType() llvm.Type {
+	// TODO(mkm) use struct type
+	return llvm.PointerType(llvm.Int8Type(), 0)
+}
+
 type FunctionType struct {
-	implementsType
 	Params  []Symbol
 	Results []Symbol
 	// TODO(mkm) receivers
 }
 
+func (b FunctionType) LlvmType() llvm.Type {
+	return llvm.PointerType(llvm.Int8Type(), 0)
+}
+
 func (s *Scope) ParseType(typeName ast.Expr) Type {
 	res, err := s.ResolveType(typeName)
-	if err!= nil {
+	if err != nil {
 		log.Fatalf("%s", err)
 	}
 	return res
