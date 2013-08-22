@@ -25,28 +25,41 @@ func (s Symbol) LlvmType() llvm.Type {
 type SymbolMap map[string]Symbol
 
 // visitors
-
 type Scope struct {
+	*token.FileSet
 	Symbols SymbolMap
 	Parent  *Scope
 }
 
+func (s Scope) GetScope() Scope {
+	return s
+}
+
 func NewScope(parent *Scope) Scope {
-	return Scope{map[string]Symbol{}, parent}
+	return NewFileSetScope(parent.FileSet, parent)
+}
+
+func NewFileSetScope(fset *token.FileSet, parent *Scope) Scope {
+	return Scope{fset, map[string]Symbol{}, parent}
 }
 
 type EHV struct {
 	ast.Visitor
 }
 
-func Walk(visitor ast.Visitor, node ast.Node) {
+type Visitor interface {
+	GetScope() Scope
+	Visit(ast.Node) ast.Visitor
+}
+
+func Walk(visitor Visitor, node ast.Node) {
 	ast.Walk(EHV{visitor}, node)
 }
 
 func (v EHV) Visit(node ast.Node) ast.Visitor {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Fprintf(os.Stderr, "%s:%d: %s\n", "dummy.go", node.Pos(), err)
+			fmt.Fprintf(os.Stderr, "%s: %s\n", v.Visitor.(Visitor).GetScope().Position(node.Pos()), err)
 			os.Exit(1)
 		}
 	}()
@@ -70,6 +83,8 @@ type ModuleVisitor struct {
 
 // contains common state shared accross the function
 type FunctionVisitor struct {
+	*ModuleVisitor
+	*FunctionVisitor
 	FunctionType FunctionType
 	Function     llvm.Value
 	Builder      llvm.Builder
@@ -118,7 +133,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				entry := llvm.AddBasicBlock(llvmFunction, "")
 				builder.SetInsertPointAtEnd(entry)
 
-				fv := &FunctionVisitor{functionType, llvmFunction, builder}
+				fv := &FunctionVisitor{v, nil, functionType, llvmFunction, builder}
 				Walk(&BlockVisitor{newScope, fv, entry}, n.Body)
 			}
 			return nil
@@ -319,11 +334,11 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 	return nil
 }
 
-func CompileFile(tree *ast.File) error {
+func CompileFile(fset *token.FileSet, tree *ast.File) error {
 	DumpToFile(tree, "/tmp/ast")
 
 	fmt.Printf("compiling %#v\n", tree)
-	v := &ModuleVisitor{NewScope(nil), llvm.NewModule(tree.Name.Name)}
+	v := &ModuleVisitor{NewFileSetScope(fset, nil), llvm.NewModule(tree.Name.Name)}
 	Walk(v, tree)
 
 	fmt.Printf("LLVM: -----------\n")
@@ -337,7 +352,7 @@ func OpenAndCompileFile(name string) error {
 	if err != nil {
 		return err
 	}
-	err = CompileFile(ast)
+	err = CompileFile(&fset, ast)
 	if err != nil {
 		return err
 	}
