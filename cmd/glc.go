@@ -34,6 +34,18 @@ func NewScope(parent *Scope) Scope {
 	return Scope{map[string]Symbol{}, parent}
 }
 
+type EHV struct {
+	ast.Visitor
+}
+
+func Walk(visitor ast.Visitor, node ast.Node) {
+	ast.Walk(EHV{visitor}, node)
+}
+
+func (v EHV) Visit(node ast.Node) ast.Visitor {
+	return v.Visitor.Visit(node)
+}
+
 type ModuleVisitor struct {
 	Scope
 	Module llvm.Module
@@ -90,7 +102,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				builder.SetInsertPointAtEnd(entry)
 
 				fv := &FunctionVisitor{functionType, llvmFunction, builder}
-				ast.Walk(&BlockVisitor{newScope, fv, entry}, n.Body)
+				Walk(&BlockVisitor{newScope, fv, entry}, n.Body)
 			}
 			return nil
 		case *ast.DeclStmt:
@@ -116,7 +128,7 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 			var value llvm.Value
 			if vs.Values != nil {
 				ev := &ExpressionVisitor{s, llvm.Value{}, typ}
-				ast.Walk(ev, vs.Values[idx])
+				Walk(ev, vs.Values[idx])
 				value = ev.Value
 			}
 			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: &value}); err != nil {
@@ -217,7 +229,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 
 func (v *ExpressionVisitor) Evaluate(exp ast.Expr) *ExpressionVisitor {
 	ev := *v
-	ast.Walk(&ev, exp)
+	Walk(&ev, exp)
 	return &ev
 }
 
@@ -235,7 +247,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 
 			for i, e := range n.Results {
 				ev := &ExpressionVisitor{v, llvm.Value{}, functionReturnSymbols[i].Type}
-				ast.Walk(ev, e)
+				Walk(ev, e)
 				values[i] = ev.Value
 				types[i] = ev.Type.LlvmType()
 			}
@@ -272,7 +284,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				values := make([]llvm.Value, len(n.Lhs))
 				for i, e := range n.Rhs {
 					ev := &ExpressionVisitor{v, llvm.Value{}, symbols[i].Type}
-					ast.Walk(ev, e)
+					Walk(ev, e)
 					values[i] = ev.Value
 				}
 				for i, sym := range symbols {
@@ -295,7 +307,7 @@ func CompileFile(tree *ast.File) error {
 
 	fmt.Printf("compiling %#v\n", tree)
 	v := &ModuleVisitor{NewScope(nil), llvm.NewModule(tree.Name.Name)}
-	ast.Walk(v, tree)
+	Walk(v, tree)
 
 	fmt.Printf("LLVM: -----------\n")
 	v.Module.Dump()
