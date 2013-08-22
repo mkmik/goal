@@ -81,7 +81,6 @@ func (v EHV) Visit(node ast.Node) ast.Visitor {
 
 func Perrorf(format string, args ...interface{}) {
 	panic(fmt.Errorf(format, args...))
-	//	log.Fatalf(format, args...)
 }
 
 type ModuleVisitor struct {
