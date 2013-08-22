@@ -8,7 +8,6 @@ import (
 	"go/parser"
 	"go/token"
 	"log"
-	"strconv"
 )
 
 type Symbol struct {
@@ -196,12 +195,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 
 			return nil
 		case *ast.BasicLit:
-			llvmType := LlvmType(v.Type)
-			val, err := strconv.ParseUint(n.Value, 10, 64)
-			if err != nil {
-				log.Fatal(err)
-			}
-			v.Value = llvm.ConstInt(llvmType, val, false)
+			v.Value = llvm.ConstIntFromString(LlvmType(v.Type), n.Value, 10)
 		case *ast.Ident:
 			symbol := v.ResolveSymbol(n.Name)
 			v.Type = symbol.Type
