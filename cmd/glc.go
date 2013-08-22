@@ -78,7 +78,8 @@ func Perrorf(format string, args ...interface{}) {
 
 type ModuleVisitor struct {
 	Scope
-	Module llvm.Module
+	Module      llvm.Module
+	PackageName string
 }
 
 // contains common state shared accross the function
@@ -108,7 +109,6 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
 		case *ast.FuncDecl:
-			fmt.Printf("FUNC DECL %s: %#v\n", n.Name, n.Type)
 			functionType := v.ParseFuncType(n.Type)
 			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, functionType.LlvmType())
 			if err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: &llvmFunction}); err != nil {
@@ -134,13 +134,33 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				builder.SetInsertPointAtEnd(entry)
 
 				fv := &FunctionVisitor{v, nil, functionType, llvmFunction, builder}
-				Walk(&BlockVisitor{newScope, fv, entry}, n.Body)
+				bv := &BlockVisitor{newScope, fv, entry}
+				// TODO(mkm) any better way to skip visiting the top level element?
+				for _, stmt := range n.Body.List {
+					Walk(bv, stmt)
+				}
 			}
 			return nil
 		case *ast.DeclStmt:
-			fmt.Printf("DECL STMT %#v\n", n)
+			Perrorf("Unimplemented decl stmt")
+		case *ast.File:
+			// root element, nothing to do
+			return v
+		case *ast.Ident:
+			if v.PackageName != "" {
+				Perrorf("Cannot have more than one top level ast.Ident")
+			}
+			v.PackageName = n.Name
+			return nil
+		case *ast.GenDecl:
+			switch n.Tok {
+			case token.IMPORT:
+				// ignore imports for now
+			default:
+				Perrorf("UNIMPLEMENTED UNKNOWN GENDECL: %#v", node)
+			}
 		default:
-			fmt.Printf("----- Module visitor: UNKNOWN %#v\n", node)
+			Perrorf("-----: Module visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	} else {
@@ -150,7 +170,6 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 }
 
 func (s *BlockVisitor) AddDecl(d ast.Decl) error {
-	fmt.Printf("MY adding decl %#v\n", d)
 	gen := d.(*ast.GenDecl)
 
 	for _, sp := range gen.Specs {
@@ -205,8 +224,6 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				Perrorf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
 			} else if v.Type != xev.Type {
 				Perrorf("Types %#v and %#v are not compatible (B)", v.Type, xev.Type)
-			} else {
-				fmt.Printf("MY BINARY TYPES: %#v, %#v, %#v\n", v.Type, xev.Type, yev.Type)
 			}
 			// types must match, thus take either one
 			v.Type = xev.Type
@@ -234,10 +251,8 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			v.Value = *symbol.Value
 			return nil
 		case *ast.CallExpr:
-			fmt.Printf("MY EXPR CALL: %#v\n", n)
 			if id, ok := n.Fun.(*ast.Ident); ok {
 				if typ, err := v.ResolveType(id); err == nil {
-					fmt.Printf("MY EXPR TYPE CONVERSION: %#v, %#v\n", n, typ)
 					if len(n.Args) != 1 {
 						Perrorf("type conversion can have only one argument")
 					}
@@ -246,7 +261,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 					//v.Value = v.Builder.CreateBitCast(ev.Value, LlvmType(typ), "")
 					v.Value = v.Builder.CreateIntCast(ev.Value, typ.LlvmType(), "")
 				} else {
-					fmt.Printf("MY NORMAL CALL %#v (err was: %v)\n", id, err)
+					Perrorf("UNIMPLEMENTED FUNCTION CALL %#v (err was: %v)\n", id, err)
 				}
 				return nil
 			}
@@ -303,7 +318,6 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			if n.Tok == token.DEFINE {
 				Perrorf("NOT IMPLEMENTED YET: type inference in var decl")
 			} else {
-				fmt.Printf("PLAIN ASSIGN STMT %#v ... %#v\n", n, n.Lhs[0])
 				if len(n.Lhs) != len(n.Rhs) {
 					Perrorf("too many/too few expressions in assignment")
 				}
@@ -324,7 +338,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				}
 			}
 		default:
-			fmt.Printf("----- Function visitor: UNKNOWN %#v\n", node)
+			fmt.Printf("----- Block visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	} else {
@@ -337,8 +351,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 func CompileFile(fset *token.FileSet, tree *ast.File) error {
 	DumpToFile(tree, "/tmp/ast")
 
-	fmt.Printf("compiling %#v\n", tree)
-	v := &ModuleVisitor{NewFileSetScope(fset, nil), llvm.NewModule(tree.Name.Name)}
+	v := &ModuleVisitor{NewFileSetScope(fset, nil), llvm.NewModule(tree.Name.Name), ""}
 	Walk(v, tree)
 
 	fmt.Printf("LLVM: -----------\n")
@@ -362,7 +375,6 @@ func OpenAndCompileFile(name string) error {
 func main() {
 	flag.Parse()
 	files := flag.Args()
-	fmt.Println("test", files)
 
 	for _, name := range files {
 		if err := OpenAndCompileFile(name); err != nil {

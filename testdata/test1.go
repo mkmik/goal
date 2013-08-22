@@ -19,6 +19,7 @@ func Test(a, b int64, c int32) int64 {
 }
 
 func main() {
+//	Test(1,2,3)
 }
 
 /*
