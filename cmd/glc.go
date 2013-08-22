@@ -224,6 +224,15 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			xev := v.Evaluate(n.X)
 			yev := v.Evaluate(n.Y)
 
+			// TODO(mkm) find a way to give a type to untyped constants
+			/**
+			if xev.Type == Any {
+				xev.Type = vev.Type
+			}
+			if yev.Type == Any {
+				yev.Type = xev.Type
+			}
+**/
 			if xev.Type != yev.Type {
 				Perrorf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
 			} else if v.Type != xev.Type {
@@ -310,7 +319,10 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 			v.Builder.CreateRet(res)
 		case *ast.ExprStmt:
-			Perrorf("NOT IMPLEMENTED YET: expression statements")
+			ev := &ExpressionVisitor{v, llvm.Value{}, Any}
+			Walk(ev, n.X)
+
+			//Perrorf("NOT IMPLEMENTED YET: expression statements")
 		case *ast.DeclStmt:
 			err := v.AddDecl(n.Decl)
 			if err != nil {

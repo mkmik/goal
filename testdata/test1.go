@@ -18,8 +18,9 @@ func Test(a, b int64, c int32) int64 {
 	return (aa + bc / a) % a
 }
 
-func main() {
-//	Test(1,2,3)
+func main(a int32) {
+	//Test(1,2,3)
+	1+a
 }
 
 /*

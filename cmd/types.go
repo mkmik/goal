@@ -12,6 +12,7 @@ var (
 )
 
 var (
+	Any    = AnyType{}
 	Int    = PrimitiveType{"int", true, llvm.Int32Type()}
 	Int8   = PrimitiveType{"int8", true, llvm.Int8Type()}
 	Int16  = PrimitiveType{"int16", true, llvm.Int16Type()}
@@ -40,6 +41,12 @@ type PrimitiveType struct {
 	Name     string
 	Signed   bool
 	llvmType llvm.Type
+}
+
+type AnyType struct {}
+
+func (b AnyType) LlvmType() llvm.Type {
+	return llvm.VoidType()
 }
 
 func (b PrimitiveType) LlvmType() llvm.Type {
