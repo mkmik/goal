@@ -43,13 +43,9 @@ func NewFileSetScope(fset *token.FileSet, parent *Scope) Scope {
 	return Scope{fset, map[string]Symbol{}, parent}
 }
 
-type EHV struct {
-	ast.Visitor
-}
-
 type Visitor interface {
+	ast.Visitor
 	GetScope() Scope
-	Visit(ast.Node) ast.Visitor
 }
 
 type SkipRoot struct {
@@ -61,22 +57,14 @@ func (s SkipRoot) Visit(ast.Node) ast.Visitor {
 }
 
 func Walk(visitor Visitor, node ast.Node) {
-	ast.Walk(EHV{visitor}, node)
-}
-
-func (v EHV) Visit(node ast.Node) ast.Visitor {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s\n", v.Visitor.(Visitor).GetScope().Position(node.Pos()), err)
+			fmt.Fprintf(os.Stderr, "%s: %s\n", visitor.GetScope().Position(node.Pos()), err)
 			os.Exit(1)
 		}
 	}()
-	res := v.Visitor.Visit(node)
-	if res != nil {
-		return EHV{res}
-	} else {
-		return nil
-	}
+
+	ast.Walk(visitor, node)
 }
 
 func Perrorf(format string, args ...interface{}) {
