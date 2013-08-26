@@ -11,6 +11,10 @@ import (
 	"os"
 )
 
+var (
+	optimize = flag.Bool("optimize", false, "true to enable llvm optimization passes")
+)
+
 type Symbol struct {
 	Name  string
 	Type  Type
@@ -214,13 +218,13 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 
 			// TODO(mkm) find a way to give a type to untyped constants
 			/**
-			if xev.Type == Any {
-				xev.Type = vev.Type
-			}
-			if yev.Type == Any {
-				yev.Type = xev.Type
-			}
-**/
+						if xev.Type == Any {
+							xev.Type = vev.Type
+						}
+						if yev.Type == Any {
+							yev.Type = xev.Type
+						}
+			**/
 			if xev.Type != yev.Type {
 				Perrorf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
 			} else if v.Type != xev.Type {
@@ -357,8 +361,23 @@ func CompileFile(fset *token.FileSet, tree *ast.File) error {
 	Walk(v, tree)
 
 	fmt.Printf("LLVM: -----------\n")
+
+	if *optimize {
+		Optimize(v.Module)
+	}
 	v.Module.Dump()
 	return nil
+}
+
+func Optimize(mod llvm.Module) {
+	pass := llvm.NewPassManager()
+	defer pass.Dispose()
+	pass.AddConstantPropagationPass()
+	pass.AddInstructionCombiningPass()
+	pass.AddPromoteMemoryToRegisterPass()
+	pass.AddGVNPass()
+	pass.AddCFGSimplificationPass()
+	pass.Run(mod)
 }
 
 func OpenAndCompileFile(name string) error {
