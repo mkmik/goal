@@ -216,19 +216,15 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			xev := v.Evaluate(n.X)
 			yev := v.Evaluate(n.Y)
 
-			// TODO(mkm) find a way to give a type to untyped constants
-			/**
-						if xev.Type == Any {
-							xev.Type = vev.Type
-						}
-						if yev.Type == Any {
-							yev.Type = xev.Type
-						}
-			**/
+			if xev.Type == Any {
+				xev.Type = yev.Type
+			}
+			if yev.Type == Any {
+				yev.Type = xev.Type
+			}
+
 			if xev.Type != yev.Type {
 				Perrorf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
-			} else if v.Type != xev.Type {
-				Perrorf("Types %#v and %#v are not compatible (B)", v.Type, xev.Type)
 			}
 			// types must match, thus take either one
 			v.Type = xev.Type
@@ -243,13 +239,22 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				v.Value = v.Builder.CreateSDiv(xev.Value, yev.Value, "")
 			case token.REM:
 				v.Value = v.Builder.CreateSRem(xev.Value, yev.Value, "")
+			case token.LSS:
+				v.Value = v.Builder.CreateICmp(llvm.IntSLT, xev.Value, yev.Value, "")
+			case token.GTR:
+				v.Value = v.Builder.CreateICmp(llvm.IntSGT, xev.Value, yev.Value, "")
 			default:
 				Perrorf("inimplemented binary operator %v", n.Op)
+			}
+
+			if v.Type != xev.Type {
+				Perrorf("Types %#v and %#v are not compatible (B)", v.Type, xev.Type)
 			}
 
 			return nil
 		case *ast.BasicLit:
 			v.Value = llvm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
+			v.Type = Any
 		case *ast.Ident:
 			symbol := v.ResolveSymbol(n.Name)
 			v.Type = symbol.Type

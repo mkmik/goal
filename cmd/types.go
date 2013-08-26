@@ -29,6 +29,31 @@ var (
 	Error = PrimitiveType{"error", false, llvm.PointerType(llvm.Int8Type(), 0)}
 )
 
+var (
+	primitiveTypes = []PrimitiveType{
+		Int,
+		Int8,
+		Int16,
+		Int32,
+		Int64,
+		Uint,
+		Uint8,
+		Uint16,
+		Uint32,
+		Uint64,
+		Bool,
+		String,
+		Error,
+	}
+	primitiveTypeByName = make(map[string]Type)
+)
+
+func init() {
+	for _, t := range primitiveTypes {
+		primitiveTypeByName[t.Name] = t
+	}
+}
+
 type Type interface {
 	LlvmType() llvm.Type
 }
@@ -88,30 +113,9 @@ func (s *Scope) ParseType(typeName ast.Expr) Type {
 func (s *Scope) ResolveType(typeName ast.Expr) (Type, error) {
 	switch t := typeName.(type) {
 	case *ast.Ident:
-		switch t.Name {
-		case "int":
-			return Int, nil
-		case "int8":
-			return Int8, nil
-		case "int16":
-			return Int16, nil
-		case "int32":
-			return Int32, nil
-		case "int64":
-			return Int64, nil
-		case "uint8":
-			return Int8, nil
-		case "uint16":
-			return Int16, nil
-		case "uint32":
-			return Int32, nil
-		case "uint64":
-			return Int64, nil
-		case "string":
-			return String, nil
-		case "error":
-			return Error, nil
-		default:
+		if primitive, ok := primitiveTypeByName[t.Name]; ok {
+			return primitive, nil
+		} else {
 			return nil, fmt.Errorf("unknown type: %s", t)
 		}
 	case *ast.SelectorExpr:
