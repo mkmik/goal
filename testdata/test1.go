@@ -20,6 +20,14 @@ func Test(a, b int64, c int32) int64 {
 	var aa, bc int64 = b * int64(c), a
 	aa, bc = bc, aa
 	var t bool = a > 0
+	if t {
+		var xaa int64 = 10 + aa
+		aa = xaa
+	} else {
+		var ybc int64 = 20
+		aa = ybc
+	}
+
 	return (aa + bc/a) % a
 }
 

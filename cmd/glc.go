@@ -9,6 +9,8 @@ import (
 	"go/token"
 	"log"
 	"os"
+	"runtime/debug"
+	"strings"
 )
 
 var (
@@ -63,6 +65,14 @@ func (s SkipRoot) Visit(ast.Node) ast.Visitor {
 func Walk(visitor Visitor, node ast.Node) {
 	defer func() {
 		if err := recover(); err != nil {
+			switch e := err.(type) {
+			case error:
+				if strings.HasPrefix(e.Error(), "runtime error:") {
+					fmt.Fprintf(os.Stderr, "%s\n", e)
+					debug.PrintStack()
+					os.Exit(1)
+				}
+			}
 			fmt.Fprintf(os.Stderr, "%s: %s\n", visitor.GetScope().Position(node.Pos()), err)
 			os.Exit(1)
 		}
@@ -171,6 +181,9 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 	for _, sp := range gen.Specs {
 		vs := sp.(*ast.ValueSpec)
 		for idx, n := range vs.Names {
+			if vs.Type == nil {
+				Perrorf("cannot declare a var without a type")
+			}
 			typ := s.ParseType(vs.Type)
 			var value llvm.Value
 			if vs.Values != nil {
@@ -187,11 +200,30 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 }
 
 func (s *Scope) ResolveSymbol(name string) Symbol {
-	res, ok := s.Symbols[name]
-	if !ok {
-		Perrorf("cannot resolve symbol: %s", name)
+	if res, err := s.ScopedResolveSymbol(name); err == nil {
+		if res.Value == nil {
+			panic(fmt.Errorf("runtime error: returning symbol '%s' with empty value: %#v", name, res))
+		}
+		return res
 	}
-	return res
+	Perrorf("cannot resolve symbol: %s", name)
+	return Symbol{}
+}
+
+func (s *Scope) ScopedResolveSymbol(name string) (Symbol, error) {
+	if res, ok := s.Symbols[name]; ok {
+		return res, nil
+	}
+
+	if s.Parent == nil {
+		return Symbol{}, fmt.Errorf("cannot resolve symbol: %s", name)
+	}
+
+	if res, err := s.Parent.ScopedResolveSymbol(name); err != nil {
+		return Symbol{}, err
+	} else {
+		return res, nil
+	}
 }
 
 func (s *Scope) AddVar(variable Symbol) error {
@@ -253,6 +285,11 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 
 			return nil
 		case *ast.BasicLit:
+			if v.Type == nil {
+				// panic(fmt.Errorf("runtime error: constant without type info")
+				v.Type = Int
+				fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXX %#v", v.Type)
+			}
 			v.Value = llvm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
 			v.Type = Any
 		case *ast.Ident:
@@ -286,6 +323,19 @@ func (v *ExpressionVisitor) Evaluate(exp ast.Expr) *ExpressionVisitor {
 	ev := *v
 	Walk(&ev, exp)
 	return &ev
+}
+
+func (v *BlockVisitor) Evaluate(typ Type, exp ast.Expr) *ExpressionVisitor {
+	ev := &ExpressionVisitor{v, llvm.Value{}, typ}
+	Walk(ev, exp)
+	return ev
+}
+
+func (v *BlockVisitor) EvaluateBlock(exp ast.Stmt) *BlockVisitor {
+	newScope := NewScope(&v.Scope)
+	bv := &BlockVisitor{newScope, v.FunctionVisitor, llvm.BasicBlock{}}
+	Walk(SkipRoot{bv}, exp)
+	return bv
 }
 
 func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
@@ -348,8 +398,37 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 					*sym.Value = values[i]
 				}
 			}
+		case *ast.IfStmt:
+			cond := v.Evaluate(Bool, n.Cond)
+			iftrue := llvm.AddBasicBlock(v.Function, "")
+			iffalse := llvm.AddBasicBlock(v.Function, "")
+			endif := llvm.AddBasicBlock(v.Function, "")
+
+			v.Builder.CreateCondBr(cond.Value, iftrue, iffalse)
+
+			v.Builder.SetInsertPointAtEnd(iftrue)
+			end := v.Builder.CreateBr(endif)
+			v.Builder.SetInsertPointBefore(end)
+			ifTrueVisitor := v.EvaluateBlock(n.Body)
+
+			v.Builder.SetInsertPointAtEnd(iffalse)
+			end = v.Builder.CreateBr(endif)
+			v.Builder.SetInsertPointBefore(end)
+			var ifFalseVisitor *BlockVisitor
+			if n.Else != nil {
+				ifFalseVisitor = v.EvaluateBlock(n.Else)
+			}
+
+			v.Builder.SetInsertPointAtEnd(endif)
+			fmt.Printf("inserting PHI, \nbase: %v\n", v.Symbols)
+			fmt.Printf("iftrue: %v\n", ifTrueVisitor.Symbols)
+			if ifFalseVisitor != nil {
+				fmt.Printf("iffalse: %v\n", ifFalseVisitor.Symbols)
+			}
+
+			//Perrorf("Unimplemented if statement %#v\n", node)
 		default:
-			fmt.Printf("----- Block visitor: UNKNOWN %#v\n", node)
+			Perrorf("----- Block visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	} else {

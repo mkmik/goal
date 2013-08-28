@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/axw/gollvm/llvm"
 	"go/ast"
-	"log"
 )
 
 var (
@@ -56,6 +55,7 @@ func init() {
 
 type Type interface {
 	LlvmType() llvm.Type
+	//	String() string
 }
 
 type IntegerType interface {
@@ -68,14 +68,22 @@ type PrimitiveType struct {
 	llvmType llvm.Type
 }
 
-type AnyType struct {}
+type AnyType struct{}
 
 func (b AnyType) LlvmType() llvm.Type {
 	return llvm.VoidType()
 }
 
+func (b AnyType) String() string {
+	return "Type(Any)"
+}
+
 func (b PrimitiveType) LlvmType() llvm.Type {
 	return b.llvmType
+}
+
+func (b PrimitiveType) String() string {
+	return fmt.Sprintf("Type(%s)", b.Name)
 }
 
 type MapType struct {
@@ -105,7 +113,7 @@ type FunctionType struct {
 func (s *Scope) ParseType(typeName ast.Expr) Type {
 	res, err := s.ResolveType(typeName)
 	if err != nil {
-		log.Fatalf("%s", err)
+		Perrorf("%s", err)
 	}
 	return res
 }
@@ -127,7 +135,7 @@ func (s *Scope) ResolveType(typeName ast.Expr) (Type, error) {
 	case *ast.ChanType:
 		return nil, fmt.Errorf("NOT IMPLEMENTED YET: chan type")
 	default:
-		return nil, fmt.Errorf("unknown type class: %#v", typeName)
+		return nil, fmt.Errorf("runtime error: unknown type class: %#v", typeName)
 	}
 	// unreachable
 	return nil, nil
@@ -181,4 +189,3 @@ func (t FunctionType) LlvmType() llvm.Type {
 	}
 	return llvm.FunctionType(func_ret_type, func_arg_types, false)
 }
-
