@@ -207,6 +207,8 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 				ev := &ExpressionVisitor{s, llvm.Value{}, typ}
 				Walk(ev, vs.Values[idx])
 				value = ev.Value
+			} else {
+				value = llvm.ConstInt(typ.LlvmType(), 0, false)
 			}
 			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: &value}); err != nil {
 				Perrorf("cannot add var %s: %s", n.Name, err)
