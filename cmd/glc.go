@@ -33,8 +33,8 @@ type SymbolMap map[string]Symbol
 // visitors
 type Scope struct {
 	*token.FileSet
-	Symbols SymbolMap
-	Parent  *Scope
+	Symbols       SymbolMap
+	ParentSymbols SymbolMap
 }
 
 func (s Scope) GetScope() Scope {
@@ -46,7 +46,21 @@ func NewScope(parent *Scope) Scope {
 }
 
 func NewFileSetScope(fset *token.FileSet, parent *Scope) Scope {
-	return Scope{fset, map[string]Symbol{}, parent}
+	parentSymbols := SymbolMap{}
+	if parent != nil {
+		parentSymbols = MergeSymbolMaps(parent.ParentSymbols, parent.Symbols)
+	}
+	return Scope{fset, SymbolMap{}, parentSymbols}
+}
+
+func MergeSymbolMaps(maps ...SymbolMap) SymbolMap {
+	res := SymbolMap{}
+	for _, m := range maps {
+		for n, s := range m {
+			res[n] = s
+		}
+	}
+	return res
 }
 
 type Visitor interface {
@@ -200,30 +214,15 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 }
 
 func (s *Scope) ResolveSymbol(name string) Symbol {
-	if res, err := s.ScopedResolveSymbol(name); err == nil {
-		if res.Value == nil {
-			panic(fmt.Errorf("runtime error: returning symbol '%s' with empty value: %#v", name, res))
-		}
+	if res, ok := s.Symbols[name]; ok {
 		return res
 	}
+	if res, ok := s.ParentSymbols[name]; ok {
+		return res
+	}
+
 	Perrorf("cannot resolve symbol: %s", name)
 	return Symbol{}
-}
-
-func (s *Scope) ScopedResolveSymbol(name string) (Symbol, error) {
-	if res, ok := s.Symbols[name]; ok {
-		return res, nil
-	}
-
-	if s.Parent == nil {
-		return Symbol{}, fmt.Errorf("cannot resolve symbol: %s", name)
-	}
-
-	if res, err := s.Parent.ScopedResolveSymbol(name); err != nil {
-		return Symbol{}, err
-	} else {
-		return res, nil
-	}
 }
 
 func (s *Scope) AddVar(variable Symbol) error {
