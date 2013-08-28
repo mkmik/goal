@@ -23,10 +23,10 @@ func Test(a, b int64, c int32) int64 {
 	if t {
 		var xaa int64 = 10 + aa
 		aa = xaa
-	} /*else {
-		var ybc int64 = 20
-		bc = ybc
-	}*/
+	} else {
+		aa = bc + 66
+		bc = bc + 10
+	}
 
 	return (aa + bc/a) % a
 }

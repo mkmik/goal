@@ -21,8 +21,6 @@ type Symbol struct {
 	Name  string
 	Type  Type
 	Value *llvm.Value
-	// debug
-	inherited bool
 }
 
 func (s Symbol) LlvmType() llvm.Type {
@@ -437,28 +435,23 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		case *ast.IfStmt:
 			cond := v.Evaluate(Bool, n.Cond)
-			entry := v.Builder.GetInsertBlock()
 			iftrue := llvm.AddBasicBlock(v.Function, "iftrue")
+			iffalse := llvm.AddBasicBlock(v.Function, "iffalse")
 			endif := llvm.AddBasicBlock(v.Function, "endif")
 
-			target := endif
-			if n.Else != nil {
-				iffalse := llvm.AddBasicBlock(v.Function, "iffalse")
-				target = iffalse
-			}
-			v.Builder.CreateCondBr(cond.Value, iftrue, target)
+			v.Builder.CreateCondBr(cond.Value, iftrue, iffalse)
 
 			v.Builder.SetInsertPointAtEnd(iftrue)
 			end := v.Builder.CreateBr(endif)
 			v.Builder.SetInsertPointBefore(end)
 			ifTrueVisitor := v.EvaluateBlock(n.Body)
 
+			v.Builder.SetInsertPointAtEnd(iffalse)
+			end = v.Builder.CreateBr(endif)
+			v.Builder.SetInsertPointBefore(end)
+
 			var ifFalseVisitor *BlockVisitor
 			if n.Else != nil {
-				v.Builder.SetInsertPointAtEnd(target)
-				end = v.Builder.CreateBr(endif)
-				v.Builder.SetInsertPointBefore(end)
-
 				ifFalseVisitor = v.EvaluateBlock(n.Else)
 			}
 
@@ -469,32 +462,43 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				fmt.Printf("iffalse: %v\n", ifFalseVisitor.Symbols)
 			}
 
-			fmt.Println("UPDATED VARIABLES IN IF TRUE CHILD BLOCKS:")
+			type Phi struct {
+				Parent Symbol
+				Left   Symbol
+				Right  Symbol
+			}
+			phis := map[string]Phi{}
+
 			ForUpdatedVars(v.Scope, ifTrueVisitor.Scope, func(a, b Symbol) {
-				fmt.Println("SYM!!!!!!!!!!!!", a.Name, a.Value, b.Value)
-
-				phi := v.Builder.CreatePHI(a.Type.LlvmType(), "")
-				phiVals := []llvm.Value{*a.Value, *b.Value}
-				phiBlocks := []llvm.BasicBlock{entry, iftrue}
-				phi.AddIncoming(phiVals, phiBlocks)
-
-				*a.Value = phi
+				phi := phis[a.Name]
+				phi.Parent = a
+				phi.Left = b
+				phis[a.Name] = phi
 			})
 			if ifFalseVisitor != nil {
-				fmt.Println("UPDATED VARIABLES IN IF FALSE BLOCKS:")
 				ForUpdatedVars(v.Scope, ifFalseVisitor.Scope, func(a, b Symbol) {
-					fmt.Println("SYM!!!!!!!!!!!!", a.Name, a.Value, b.Value)
-
-					phi := v.Builder.CreatePHI(a.Type.LlvmType(), "")
-					phiVals := []llvm.Value{*a.Value, *b.Value}
-					phiBlocks := []llvm.BasicBlock{entry, target}
-					phi.AddIncoming(phiVals, phiBlocks)
-
-					*a.Value = phi
+					phi := phis[a.Name]
+					phi.Parent = a
+					phi.Right = b
+					phis[a.Name] = phi
 				})
 			}
 
-			//Perrorf("Unimplemented if statement %#v\n", node)
+			for _, p := range phis {
+				if p.Left.Value == nil {
+					p.Left = p.Parent
+				}
+				if p.Right.Value == nil {
+					p.Right = p.Parent
+				}
+
+				phi := v.Builder.CreatePHI(p.Parent.Type.LlvmType(), "")
+				phiVals := []llvm.Value{*p.Left.Value, *p.Right.Value}
+				phiBlocks := []llvm.BasicBlock{iftrue, iffalse}
+				phi.AddIncoming(phiVals, phiBlocks)
+
+				*p.Parent.Value = phi
+			}
 		default:
 			Perrorf("----- Block visitor: UNKNOWN %#v\n", node)
 			return v
