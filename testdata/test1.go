@@ -19,14 +19,14 @@ func TestCmp(a, b int64) bool {
 func Test(a, b int64, c int32) int64 {
 	var aa, bc int64 = b * int64(c), a
 	aa, bc = bc, aa
-	var t bool = a > 0
+	var t bool = a > b
 	if t {
 		var xaa int64 = 10 + aa
 		aa = xaa
-	} else {
+	} /*else {
 		var ybc int64 = 20
-		aa = ybc
-	}
+		bc = ybc
+	}*/
 
 	return (aa + bc/a) % a
 }

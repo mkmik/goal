@@ -21,6 +21,8 @@ type Symbol struct {
 	Name  string
 	Type  Type
 	Value *llvm.Value
+	// debug
+	inherited bool
 }
 
 func (s Symbol) LlvmType() llvm.Type {
@@ -54,9 +56,12 @@ func NewFileSetScope(fset *token.FileSet, parent *Scope) Scope {
 }
 
 func MergeSymbolMaps(maps ...SymbolMap) SymbolMap {
+	//fmt.Printf("MERGING SYMBOL MAPS %#v\n", maps)
 	res := SymbolMap{}
 	for _, m := range maps {
 		for n, s := range m {
+			v := *s.Value
+			s.Value = &v
 			res[n] = s
 		}
 	}
@@ -153,7 +158,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				builder := llvm.NewBuilder()
 				defer builder.Dispose()
 
-				entry := llvm.AddBasicBlock(llvmFunction, "")
+				entry := llvm.AddBasicBlock(llvmFunction, "entry")
 				builder.SetInsertPointAtEnd(entry)
 
 				fv := &FunctionVisitor{v, nil, functionType, llvmFunction, builder}
@@ -394,27 +399,34 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 					values[i] = ev.Value
 				}
 				for i, sym := range symbols {
+					fmt.Printf("UPDATING SCOPE, var:%s, value was: %v, now: %v\n", sym.Name, *sym.Value, values[i])
 					*sym.Value = values[i]
 				}
 			}
 		case *ast.IfStmt:
 			cond := v.Evaluate(Bool, n.Cond)
-			iftrue := llvm.AddBasicBlock(v.Function, "")
-			iffalse := llvm.AddBasicBlock(v.Function, "")
-			endif := llvm.AddBasicBlock(v.Function, "")
+			entry := v.Builder.GetInsertBlock()
+			iftrue := llvm.AddBasicBlock(v.Function, "iftrue")
+			endif := llvm.AddBasicBlock(v.Function, "endif")
 
-			v.Builder.CreateCondBr(cond.Value, iftrue, iffalse)
+			target := endif
+			if n.Else != nil {
+				iffalse := llvm.AddBasicBlock(v.Function, "iffalse")
+				target = iffalse
+			}
+			v.Builder.CreateCondBr(cond.Value, iftrue, target)
 
 			v.Builder.SetInsertPointAtEnd(iftrue)
 			end := v.Builder.CreateBr(endif)
 			v.Builder.SetInsertPointBefore(end)
 			ifTrueVisitor := v.EvaluateBlock(n.Body)
 
-			v.Builder.SetInsertPointAtEnd(iffalse)
-			end = v.Builder.CreateBr(endif)
-			v.Builder.SetInsertPointBefore(end)
 			var ifFalseVisitor *BlockVisitor
 			if n.Else != nil {
+				v.Builder.SetInsertPointAtEnd(target)
+				end = v.Builder.CreateBr(endif)
+				v.Builder.SetInsertPointBefore(end)
+
 				ifFalseVisitor = v.EvaluateBlock(n.Else)
 			}
 
@@ -423,6 +435,31 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			fmt.Printf("iftrue: %v\n", ifTrueVisitor.Symbols)
 			if ifFalseVisitor != nil {
 				fmt.Printf("iffalse: %v\n", ifFalseVisitor.Symbols)
+			}
+
+			fmt.Println("UPDATED VARIABLES IN IF TRUE CHILD BLOCKS:")
+			ForUpdatedVars(v.Scope, ifTrueVisitor.Scope, func(a, b Symbol) {
+				fmt.Println("SYM!!!!!!!!!!!!", a.Name, a.Value, b.Value)
+
+				phi := v.Builder.CreatePHI(a.Type.LlvmType(), "")
+				phiVals := []llvm.Value{*a.Value, *b.Value}
+				phiBlocks := []llvm.BasicBlock{entry, iftrue}
+				phi.AddIncoming(phiVals, phiBlocks)
+
+				*a.Value = phi
+			})
+			if ifFalseVisitor != nil {
+				fmt.Println("UPDATED VARIABLES IN IF FALSE BLOCKS:")
+				ForUpdatedVars(v.Scope, ifFalseVisitor.Scope, func(a, b Symbol) {
+					fmt.Println("SYM!!!!!!!!!!!!", a.Name, a.Value, b.Value)
+
+					phi := v.Builder.CreatePHI(a.Type.LlvmType(), "")
+					phiVals := []llvm.Value{*a.Value, *b.Value}
+					phiBlocks := []llvm.BasicBlock{entry, target}
+					phi.AddIncoming(phiVals, phiBlocks)
+
+					*a.Value = phi
+				})
 			}
 
 			//Perrorf("Unimplemented if statement %#v\n", node)
@@ -435,6 +472,16 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		v.DumpScope()
 	}
 	return nil
+}
+
+func ForUpdatedVars(parent, child Scope, fn func(a, b Symbol)) {
+	for n, s := range parent.Symbols {
+		if cs, ok := child.ParentSymbols[n]; ok {
+			if *s.Value != *cs.Value {
+				fn(s, cs)
+			}
+		}
+	}
 }
 
 func CompileFile(fset *token.FileSet, tree *ast.File) error {
