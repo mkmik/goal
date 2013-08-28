@@ -243,14 +243,37 @@ func (s *Scope) AddVar(variable Symbol) error {
 	return nil
 }
 
+func (v *ExpressionVisitor) IsConst(node ast.Node) bool {
+	switch e := node.(type) {
+	case *ast.BasicLit:
+		return true
+	case *ast.ParenExpr:
+		return v.IsConst(e.X)
+	default:
+		return false
+	}
+}
+
 func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 	if node != nil {
 		switch n := node.(type) {
 		case *ast.ParenExpr:
 			return v
 		case *ast.BinaryExpr:
-			xev := v.Evaluate(n.X)
-			yev := v.Evaluate(n.Y)
+			if v.IsConst(n.X) && v.IsConst(n.Y) {
+				Perrorf("expression with only constants not implemented yet...")
+			}
+
+			var xev, yev *ExpressionVisitor
+			if v.IsConst(n.X) {
+				yev = v.Evaluate(n.Y)
+				v.Type = yev.Type
+				xev = v.Evaluate(n.X)
+			} else {
+				xev = v.Evaluate(n.X)
+				v.Type = xev.Type
+				yev = v.Evaluate(n.Y)
+			}
 
 			if xev.Type == Any {
 				xev.Type = yev.Type
@@ -277,14 +300,12 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				v.Value = v.Builder.CreateSRem(xev.Value, yev.Value, "")
 			case token.LSS:
 				v.Value = v.Builder.CreateICmp(llvm.IntSLT, xev.Value, yev.Value, "")
+				v.Type = Bool
 			case token.GTR:
 				v.Value = v.Builder.CreateICmp(llvm.IntSGT, xev.Value, yev.Value, "")
+				v.Type = Bool
 			default:
 				Perrorf("inimplemented binary operator %v", n.Op)
-			}
-
-			if v.Type != xev.Type {
-				Perrorf("Types %#v and %#v are not compatible (B)", v.Type, xev.Type)
 			}
 
 			return nil
@@ -294,12 +315,23 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				v.Type = Int
 				fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXX %#v", v.Type)
 			}
+
+			if v.Type == Bool {
+				Perrorf("Boolean arithmetic is not allowed: %#v", n)
+			}
 			v.Value = llvm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
-			v.Type = Any
 		case *ast.Ident:
-			symbol := v.ResolveSymbol(n.Name)
-			v.Type = symbol.Type
-			v.Value = *symbol.Value
+			if n.Name == "true" {
+				v.Type = Bool
+				v.Value = llvm.ConstInt(v.Type.LlvmType(), 1, false)
+			} else if n.Name == "false" {
+				v.Type = Bool
+				v.Value = llvm.ConstInt(v.Type.LlvmType(), 0, false)
+			} else {
+				symbol := v.ResolveSymbol(n.Name)
+				v.Type = symbol.Type
+				v.Value = *symbol.Value
+			}
 			return nil
 		case *ast.CallExpr:
 			if id, ok := n.Fun.(*ast.Ident); ok {
