@@ -19,7 +19,8 @@ func TestCmp(a, b int64) bool {
 func Test(a, b int64, c int32) int64 {
 	var aa, bc int64 = b * int64(c), a
 	aa, bc = bc, aa
-	var t bool = a > b
+	var cnst int64 = 0
+	var t bool = a > cnst
 	if t {
 		var xaa int64 = 10 + aa
 		aa = xaa
