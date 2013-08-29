@@ -46,6 +46,7 @@ func TestNested(a int64) int64 {
 }
 
 func main() int64 {
+//	Printf("ciao\n")
 	return TestNested(100)
 }
 

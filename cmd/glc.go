@@ -354,7 +354,6 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 						// TODO(mkm) check types
 						args = append(args, ex.Value)
 					}
-					fmt.Printf("CAll ast: %#v, %#v", n.Args, args)
 					v.Value = v.Builder.CreateCall(*fs.Value, args, "")
 				}
 				return nil
@@ -519,7 +518,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 	} else {
 		//		fmt.Printf("popping\n")
-		v.DumpScope()
+		//v.DumpScope()
 	}
 	return nil
 }
