@@ -15,6 +15,7 @@ import (
 
 var (
 	optimize = flag.Bool("optimize", false, "true to enable llvm optimization passes")
+	cfg      = flag.Bool("cfg", false, "view cfg")
 )
 
 type Symbol struct {
@@ -162,6 +163,11 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 				fv := &FunctionVisitor{v, nil, functionType, llvmFunction, builder}
 				bv := &BlockVisitor{newScope, fv, entry}
 				Walk(SkipRoot{bv}, n.Body)
+
+				// debug
+				if *cfg {
+					llvm.ViewFunctionCFG(llvmFunction)
+				}
 			}
 			return nil
 		case *ast.DeclStmt:
