@@ -348,7 +348,18 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 					ev := v.Evaluate(n.Args[0])
 					v.Value = v.Builder.CreateIntCast(ev.Value, typ.LlvmType(), "")
 				} else {
-					Perrorf("UNIMPLEMENTED FUNCTION CALL %#v (err was: %v)\n", id, err)
+					fs := v.ResolveSymbol(id.Name)
+					if _, ok := fs.Type.(FunctionType); !ok {
+						Perrorf("Calling a non function")
+					}
+					args := []llvm.Value{}
+					for _, a := range n.Args {
+						ex := v.Evaluate(a)
+						// TODO(mkm) check types
+						args = append(args, ex.Value)
+					}
+					fmt.Printf("CAll ast: %#v, %#v", n.Args, args)
+					v.Value = v.Builder.CreateCall(*fs.Value, args, "")
 				}
 				return nil
 			}

@@ -35,14 +35,16 @@ func Test(a, b int64, c int32) int64 {
 func TestNested(a int64) int64 {
 	if a > 0 {
 
-		if a < 2 {
-			//a = 100
-			var z int64 = a + 1
+		if a < 100 {
+			a = a + 1
 		}
 
-		a = a + 1
 	}
 	return a
+}
+
+func main() int64 {
+	return TestNested(1)
 }
 
 /*
