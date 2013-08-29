@@ -16,11 +16,12 @@ func TestCmp(a, b int64) bool {
 	return a > b
 }
 
+/*
 func Test(a, b int64, c int32) int64 {
 	var aa, bc int64 = b * int64(c), a
 	aa, bc = bc, aa
-	var t bool = a > 0
-	if t {
+	var x int64
+	if x = a + 2; x > 0 {
 		var xaa int64 = 10 + aa
 		aa = xaa
 	} else {
@@ -30,6 +31,28 @@ func Test(a, b int64, c int32) int64 {
 
 	return (aa + bc/a) % a
 }
+*/
+func TestNested(a int64) int64 {
+	if a > 0 {
+
+		if a < 2 {
+			//a = 100
+			var z int64 = a + 1
+		}
+
+		a = a + 1
+	}
+	return a
+}
+
+/*
+func TestScope(a int64) int64 {
+	if a:=1; a>0 {
+		a = 2
+	}
+	return a
+}
+*/
 
 //func main(a int32) {
 //Test(1,2,3)

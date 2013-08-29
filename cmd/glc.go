@@ -437,11 +437,16 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 					values[i] = ev.Value
 				}
 				for i, sym := range symbols {
-					fmt.Printf("UPDATING SCOPE, var:%s, value was: %v, now: %v\n", sym.Name, *sym.Value, values[i])
 					*sym.Value = values[i]
 				}
 			}
 		case *ast.IfStmt:
+			var scope Scope = v.Scope
+			if n.Init != nil {
+				// TODO(mkm) fix scoping issues when detecting changed values
+				//scope = NewScope(&v.Scope)
+				Walk(v, n.Init)
+			}
 			cond := v.Evaluate(Bool, n.Cond)
 			iftrue := llvm.AddBasicBlock(v.Function, "iftrue")
 			iffalse := llvm.AddBasicBlock(v.Function, "iffalse")
@@ -450,25 +455,19 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			v.Builder.CreateCondBr(cond.Value, iftrue, iffalse)
 
 			v.Builder.SetInsertPointAtEnd(iftrue)
-			end := v.Builder.CreateBr(endif)
-			v.Builder.SetInsertPointBefore(end)
 			ifTrueVisitor := v.EvaluateBlock(n.Body)
+			ifTrueSource := v.Builder.GetInsertBlock()
+			v.Builder.CreateBr(endif)
 
 			v.Builder.SetInsertPointAtEnd(iffalse)
-			end = v.Builder.CreateBr(endif)
-			v.Builder.SetInsertPointBefore(end)
-
+			ifFalseSource := iffalse
 			var ifFalseVisitor *BlockVisitor
 			if n.Else != nil {
 				ifFalseVisitor = v.EvaluateBlock(n.Else)
+				ifFalseSource = v.Builder.GetInsertBlock()
 			}
-
+			v.Builder.CreateBr(endif)
 			v.Builder.SetInsertPointAtEnd(endif)
-			fmt.Printf("inserting PHI, \nbase: %v\n", v.Symbols)
-			fmt.Printf("iftrue: %v\n", ifTrueVisitor.Symbols)
-			if ifFalseVisitor != nil {
-				fmt.Printf("iffalse: %v\n", ifFalseVisitor.Symbols)
-			}
 
 			type Phi struct {
 				Parent Symbol
@@ -477,14 +476,14 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 			phis := map[string]Phi{}
 
-			ForUpdatedVars(v.Scope, ifTrueVisitor.Scope, func(a, b Symbol) {
+			ForUpdatedVars(scope, ifTrueVisitor.Scope, func(a, b Symbol) {
 				phi := phis[a.Name]
 				phi.Parent = a
 				phi.Left = b
 				phis[a.Name] = phi
 			})
 			if ifFalseVisitor != nil {
-				ForUpdatedVars(v.Scope, ifFalseVisitor.Scope, func(a, b Symbol) {
+				ForUpdatedVars(scope, ifFalseVisitor.Scope, func(a, b Symbol) {
 					phi := phis[a.Name]
 					phi.Parent = a
 					phi.Right = b
@@ -502,7 +501,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 
 				phi := v.Builder.CreatePHI(p.Parent.Type.LlvmType(), "")
 				phiVals := []llvm.Value{*p.Left.Value, *p.Right.Value}
-				phiBlocks := []llvm.BasicBlock{iftrue, iffalse}
+				phiBlocks := []llvm.BasicBlock{ifTrueSource, ifFalseSource}
 				phi.AddIncoming(phiVals, phiBlocks)
 
 				*p.Parent.Value = phi
