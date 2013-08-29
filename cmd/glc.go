@@ -321,7 +321,14 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			if v.Type == Bool {
 				Perrorf("Boolean arithmetic is not allowed: %#v", n)
 			}
-			v.Value = llvm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
+			switch n.Kind {
+			case token.INT:
+				v.Value = llvm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
+			case token.STRING:
+				v.Value = v.Builder.CreateGlobalStringPtr(n.Value, "")
+			default:
+				Perrorf("Unimplemented literal: %#v", n)
+			}
 		case *ast.Ident:
 			if n.Name == "true" {
 				v.Type = Bool

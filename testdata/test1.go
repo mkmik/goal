@@ -45,8 +45,14 @@ func TestNested(a int64) int64 {
 	return a
 }
 
+func Printf(a string) int64 {
+	return 0
+}
+
 func main() int64 {
-//	Printf("ciao\n")
+	//Printf("ciao\n")
+	var x string = "ciao\n"
+	Printf(x)
 	return TestNested(100)
 }
 
