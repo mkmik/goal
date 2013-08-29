@@ -36,15 +36,17 @@ func TestNested(a int64) int64 {
 	if a > 0 {
 
 		if a < 100 {
-			a = a + 1
+			a = a + 10
+		} else {
+			a = a + 5
 		}
-
+		a = a + 20
 	}
 	return a
 }
 
 func main() int64 {
-	return TestNested(1)
+	return TestNested(100)
 }
 
 /*

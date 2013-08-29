@@ -34,8 +34,7 @@ type SymbolMap map[string]Symbol
 // visitors
 type Scope struct {
 	*token.FileSet
-	Symbols       SymbolMap
-	ParentSymbols SymbolMap
+	Symbols SymbolMap
 }
 
 func (s Scope) GetScope() Scope {
@@ -47,11 +46,11 @@ func NewScope(parent *Scope) Scope {
 }
 
 func NewFileSetScope(fset *token.FileSet, parent *Scope) Scope {
-	parentSymbols := SymbolMap{}
+	mergedSymbols := SymbolMap{}
 	if parent != nil {
-		parentSymbols = MergeSymbolMaps(parent.ParentSymbols, parent.Symbols)
+		mergedSymbols = MergeSymbolMaps(parent.Symbols)
 	}
-	return Scope{fset, SymbolMap{}, parentSymbols}
+	return Scope{fset, mergedSymbols}
 }
 
 func MergeSymbolMaps(maps ...SymbolMap) SymbolMap {
@@ -226,9 +225,6 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 
 func (s *Scope) ResolveSymbol(name string) Symbol {
 	if res, ok := s.Symbols[name]; ok {
-		return res
-	}
-	if res, ok := s.ParentSymbols[name]; ok {
 		return res
 	}
 
@@ -530,7 +526,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 
 func ForUpdatedVars(parent, child Scope, fn func(a, b Symbol)) {
 	for n, s := range parent.Symbols {
-		if cs, ok := child.ParentSymbols[n]; ok {
+		if cs, ok := child.Symbols[n]; ok {
 			if *s.Value != *cs.Value {
 				fn(s, cs)
 			}
