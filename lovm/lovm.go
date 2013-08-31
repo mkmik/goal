@@ -1,9 +1,8 @@
-package main
+package lovm
 
 import (
 	"fmt"
 	"io"
-	"os"
 )
 
 type Sequence int
@@ -121,18 +120,3 @@ func (s *Sequence) Next() Sequence {
 	return res
 }
 
-func IAdd(typ string, op1, op2 Value) Value {
-	return &Binop{"add", "", typ, op1, op2}
-}
-
-func main() {
-	ctx := NewContext(os.Stdout)
-	entry := NewBlock()
-	entry.Assign(Symbol{"a", Sequence(0)}, Const{"i64", "0"})
-
-	op1 := IAdd("i64", ConstInt("i64", 1), ConstInt("i64", 2))
-	op2 := IAdd("i64", op1, ConstInt("i64", 3))
-	entry.Assign(Symbol{"a", Sequence(0)}, op1)
-	entry.Assign(Symbol{"a", Sequence(0)}, op2)
-	entry.Emit(&ctx)
-}
