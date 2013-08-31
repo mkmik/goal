@@ -12,13 +12,17 @@ type Context struct {
 	Indent string
 	Tmps   Sequence
 	Scopes Sequence
+	Labels Sequence
 
 	Blocks []*Block
 	Values map[Value]bool
 }
 
-func NewContext(w io.Writer) Context {
-	return Context{Writer: w, Values: map[Value]bool{}}
+func NewContext(w io.Writer) (res Context) {
+	return Context{
+		Writer: w,
+		Values: map[Value]bool{},
+	}
 }
 
 func (s *Sequence) Next() Sequence {

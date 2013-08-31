@@ -2,11 +2,13 @@ package lovm
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
 type Block struct {
-	Valuable
+	Labelable
+	Phis    []Value
 	Values  []Value
 	Preds   []*Block
 	Vars    map[Symbol]Value
@@ -14,7 +16,7 @@ type Block struct {
 }
 
 type Emitter interface {
-	Prepare(*Context)
+	Prepare(*Context, *Block)
 	Emit(*Context)
 }
 
@@ -32,12 +34,20 @@ type Valuable struct {
 	Res Sequence
 }
 
+type Labelable struct {
+	Res Sequence
+}
+
 func (b Valuable) Name() string {
 	return fmt.Sprintf("%%%d", b.Res)
 }
 
-func (b *Valuable) Prepare(ctx *Context) {
-	b.Res = ctx.Tmps.Next()
+func (v *Valuable) Prepare(ctx *Context, b *Block) {
+	v.Res = ctx.Tmps.Next()
+}
+
+func (v *Labelable) Prepare(ctx *Context) {
+	v.Res = ctx.Labels.Next()
 }
 
 type Binop struct {
@@ -49,7 +59,6 @@ type Binop struct {
 }
 
 type BranchOp struct {
-	Valuable
 	Labels []*Block
 }
 
@@ -69,16 +78,58 @@ type Const struct {
 	Val string
 }
 
+type RefOp struct {
+	Valuable
+	Typ string
+	Sym Symbol
+}
+
+type PhiParam struct {
+	Value string
+	Label string
+}
+
+type PhiOp struct {
+	RefOp
+	Phis []PhiParam
+}
+
 func (c Const) Name() string {
 	return c.Val
 }
 
-func (b Const) Emit(Ectx *Context) {
+func (b Const) Emit(*Context) {
 	// no instructions emitted for consts
 }
 
-func (b Const) Prepare(Ectx *Context) {
+func (b Const) Prepare(*Context, *Block) {
 	// no instructions emitted for consts
+}
+
+func (b RefOp) Emit(ctx *Context) {
+	if false {
+		log.Fatalf("RefOps have to be replaced during prepare")
+	}
+}
+
+func (r *RefOp) Prepare(ctx *Context, b *Block) {
+	r.Valuable.Prepare(ctx, b)
+
+	phis := []PhiParam{}
+	for _, p := range b.Preds {
+		if v, ok := p.ResolveVar(r.Sym); ok {
+			phis = append(phis, PhiParam{v.Name(), p.Name()})
+		}
+	}
+	b.Phis = append(b.Phis, &PhiOp{*r, phis})
+}
+
+func (b PhiOp) Emit(ctx *Context) {
+	comps := []string{}
+	for _, phi := range b.Phis {
+		comps = append(comps, fmt.Sprintf("[ %s, %s ]", phi.Value, phi.Label))
+	}
+	ctx.Emitf("%s = phi %s %s", b.Name(), b.Typ, strings.Join(comps, ", "))
 }
 
 func ConstInt(typ string, value int) Const {
@@ -87,6 +138,14 @@ func ConstInt(typ string, value int) Const {
 
 func (b *Binop) Emit(ctx *Context) {
 	ctx.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ, b.Op1.Name(), b.Op2.Name())
+}
+
+func (b *BranchOp) Name() string {
+	log.Fatalf("Branch ops should never be named")
+	return ""
+}
+
+func (b *BranchOp) Prepare(*Context, *Block) {
 }
 
 func (b *BranchOp) Emit(ctx *Context) {
@@ -108,6 +167,18 @@ func (b *Block) Add(value Value) {
 	}
 }
 
+func (b *Block) ResolveVar(symbol Symbol) (Value, bool) {
+	if v, ok := b.Vars[symbol]; ok {
+		return v, ok
+	}
+	if len(b.Preds) == 1 {
+		return b.Preds[0].ResolveVar(symbol)
+	} else if len(b.Preds) > 1 {
+		log.Printf("Assert: block %#v has multiple predecessors but no PHI for var %#v", b, symbol)
+	}
+	return nil, false
+}
+
 func (b *Block) Assign(symbol Symbol, value Value) {
 	b.Add(value)
 	b.Vars[symbol] = value
@@ -124,14 +195,14 @@ func (b *Block) AddPred(source *Block) {
 
 func (b *Block) Branch(target *Block) {
 	target.AddPred(b)
-	b.Add(&BranchOp{Valuable{}, []*Block{target}})
+	b.Add(&BranchOp{[]*Block{target}})
 }
 
 func (b *Block) BranchIf(value Value, ifTrue, ifFalse *Block) {
 	b.Add(value)
 	ifTrue.AddPred(b)
 	ifFalse.AddPred(b)
-	b.Add(&BranchIfOp{BranchOp{Valuable{}, []*Block{ifTrue, ifFalse}}, value})
+	b.Add(&BranchIfOp{BranchOp{[]*Block{ifTrue, ifFalse}}, value})
 }
 
 func (b *Block) Return(typ string, value Value) {
@@ -144,10 +215,15 @@ func (b *Block) Name() string {
 }
 
 func (b *Block) Prepare(ctx *Context) {
-	b.Valuable.Prepare(ctx)
+	b.Labelable.Prepare(ctx)
 	for _, v := range b.Values {
-		v.Prepare(ctx)
+		v.Prepare(ctx, b)
 	}
+	// insert phi nodes
+	for _, p := range b.Phis {
+		b.Vars[p.(*PhiOp).Sym] = p
+	}
+	b.Values = append(b.Phis, b.Values...)
 }
 
 func (b *Block) PrettyPreds() string {

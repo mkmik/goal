@@ -13,8 +13,10 @@ func main() {
 
 	op1 := lovm.IAdd("i32", lovm.ConstInt("i32", 1), lovm.ConstInt("i32", 2))
 	op2 := lovm.IAdd("i32", op1, lovm.ConstInt("i32", 3))
-	entry.Assign(lovm.Symbol{"a", lovm.Sequence(0)}, op1)
-	entry.Assign(lovm.Symbol{"a", lovm.Sequence(0)}, op2)
+
+	varA := lovm.Symbol{"a", lovm.Sequence(0)}
+	entry.Assign(varA, op1)
+	entry.Assign(varA, op2)
 
 	ifTrue := ctx.NewBlock()
 	ifFalse := ctx.NewBlock()
@@ -25,8 +27,8 @@ func main() {
 	ifTrue.Branch(endIf)
 	ifFalse.Branch(endIf)
 
-	fmt.Printf("define i32 @main(i32) {\n")
-	endIf.Return("i32", op2)
+	fmt.Printf("define i32 @main() {\n")
+	endIf.Return("i32", lovm.Ref("i32", varA))
 	ctx.Emit()
 	fmt.Printf("}\n")
 }
