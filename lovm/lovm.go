@@ -2,11 +2,13 @@ package lovm
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Block struct {
 	Valuable
 	Values  []Value
+	Preds   []*Block
 	Vars    map[Symbol]Value
 	Context *Context
 }
@@ -111,12 +113,24 @@ func (b *Block) Assign(symbol Symbol, value Value) {
 	b.Vars[symbol] = value
 }
 
+func (b *Block) AddPred(source *Block) {
+	for _, p := range b.Preds {
+		if p == source {
+			return
+		}
+	}
+	b.Preds = append(b.Preds, source)
+}
+
 func (b *Block) Branch(target *Block) {
+	target.AddPred(b)
 	b.Add(&BranchOp{Valuable{}, []*Block{target}})
 }
 
 func (b *Block) BranchIf(value Value, ifTrue, ifFalse *Block) {
 	b.Add(value)
+	ifTrue.AddPred(b)
+	ifFalse.AddPred(b)
 	b.Add(&BranchIfOp{BranchOp{Valuable{}, []*Block{ifTrue, ifFalse}}, value})
 }
 
@@ -136,8 +150,17 @@ func (b *Block) Prepare(ctx *Context) {
 	}
 }
 
+func (b *Block) PrettyPreds() string {
+	res := make([]string, len(b.Preds))
+	for i, p := range b.Preds {
+		res[i] = p.Name()
+	}
+	return strings.Join(res, ", ")
+}
+
 func (b *Block) Emit(ctx *Context) {
-	ctx.Emitf("label%d:", b.Res)
+	preds := b.PrettyPreds()
+	ctx.Emitf("label%d:\t\t\t\t\t\t; preds = %s", b.Res, preds)
 	ctx.Indent = "  "
 	defer func() {
 		ctx.Indent = ""
