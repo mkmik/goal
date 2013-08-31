@@ -14,10 +14,11 @@ type Context struct {
 	Scopes Sequence
 
 	Blocks []*Block
+	Values map[Value]bool
 }
 
 func NewContext(w io.Writer) Context {
-	return Context{Writer: w}
+	return Context{Writer: w, Values: map[Value]bool{}}
 }
 
 func (s *Sequence) Next() Sequence {
@@ -27,7 +28,7 @@ func (s *Sequence) Next() Sequence {
 }
 
 func (ctx *Context) NewBlock() *Block {
-	res := NewBlock()
+	res := NewBlock(ctx)
 	ctx.Blocks = append(ctx.Blocks, res)
 	return res
 }
@@ -39,6 +40,10 @@ func (ctx *Context) Emitf(format string, args ...interface{}) {
 }
 
 func (ctx *Context) Emit() {
+	for _, b := range ctx.Blocks {
+		b.Prepare(ctx)
+	}
+
 	for _, b := range ctx.Blocks {
 		b.Emit(ctx)
 	}
