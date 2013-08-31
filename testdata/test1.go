@@ -33,16 +33,17 @@ func Test(a, b int64, c int32) int64 {
 }
 */
 func TestNested(a int64) int64 {
+	var x int64 = a * a
 	if a > 0 {
-
 		if a < 100 {
-			a = a + 10
+			a = x + 10
 		} else {
 			a = a + 5
+			x = 12
 		}
 		a = a + 20
 	}
-	return a
+	return a + x
 }
 
 func Printf(a string) int64 {
