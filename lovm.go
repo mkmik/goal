@@ -9,8 +9,13 @@ import (
 type Sequence int
 
 type Context struct {
+	Writer io.Writer
 	Tmps   Sequence
 	Scopes Sequence
+}
+
+func (ctx *Context) Emitf(format string, args ...interface{}) {
+	fmt.Fprintf(ctx.Writer, "  %s\n", fmt.Sprintf(format, args...))
 }
 
 type Block struct {
@@ -19,7 +24,7 @@ type Block struct {
 }
 
 type Emitter interface {
-	Emit(io.Writer, *Context)
+	Emit(*Context)
 }
 
 type Value interface {
@@ -49,17 +54,21 @@ func (c Const) Name() string {
 	return c.Val
 }
 
-func (b Const) Emit(w io.Writer, ctx *Context) {
+func (b Const) Emit(Ectx *Context) {
 	// no instructions emitted for consts
+}
+
+func ConstInt(typ string, value int) Const {
+	return Const{typ, fmt.Sprintf("%d", value)}
 }
 
 func (b Binop) Name() string {
 	return b.Res
 }
 
-func (b *Binop) Emit(w io.Writer, ctx *Context) {
+func (b *Binop) Emit(ctx *Context) {
 	b.Res = fmt.Sprintf("%%%d", ctx.Tmps.Next())
-	fmt.Fprintf(w, "  %s = %s %s %s, %s\n", b.Res, b.Instr, b.Typ, b.Op1.Name(), b.Op2.Name())
+	ctx.Emitf("%s = %s %s %s, %s", b.Res, b.Instr, b.Typ, b.Op1.Name(), b.Op2.Name())
 }
 
 func (b *Block) Assign(symbol Symbol, value Value) {
@@ -76,9 +85,9 @@ func (b *Block) BranchIf(value Value, ifTrue, ifFalse *Block) {
 	b.Values = append(b.Values, DebugInstrf("brif ...."))
 }
 
-func (b *Block) Emit(w io.Writer, ctx *Context) {
+func (b *Block) Emit(ctx *Context) {
 	for _, v := range b.Values {
-		v.Emit(w, ctx)
+		v.Emit(ctx)
 	}
 }
 
@@ -94,16 +103,16 @@ func (d DebugInstr) Name() string {
 	return "%debuginstr"
 }
 
-func (d DebugInstr) Emit(w io.Writer, ctx *Context) {
-	fmt.Fprintf(w, "%s\n", d.Source)
+func (d DebugInstr) Emit(ctx *Context) {
+	ctx.Emitf("%s\n", d.Source)
 }
 
 func NewBlock() Block {
 	return Block{Vars: map[Symbol]Value{}}
 }
 
-func NewContext() Context {
-	return Context{}
+func NewContext(w io.Writer) Context {
+	return Context{Writer: w}
 }
 
 func (s *Sequence) Next() Sequence {
@@ -112,14 +121,18 @@ func (s *Sequence) Next() Sequence {
 	return res
 }
 
+func IAdd(typ string, op1, op2 Value) Value {
+	return &Binop{"add", "", typ, op1, op2}
+}
+
 func main() {
-	ctx := NewContext()
+	ctx := NewContext(os.Stdout)
 	entry := NewBlock()
 	entry.Assign(Symbol{"a", Sequence(0)}, Const{"i64", "0"})
-	
-	op1 := &Binop{"add", "", "i64", Const{"i64", "1"}, Const{"i64", "1"}}
-	op2 := &Binop{"add", "", "i64", op1, Const{"i64", "2"}}
+
+	op1 := IAdd("i64", ConstInt("i64", 1), ConstInt("i64", 2))
+	op2 := IAdd("i64", op1, ConstInt("i64", 3))
 	entry.Assign(Symbol{"a", Sequence(0)}, op1)
 	entry.Assign(Symbol{"a", Sequence(0)}, op2)
-	entry.Emit(os.Stdout, &ctx)
+	entry.Emit(&ctx)
 }
