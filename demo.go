@@ -13,11 +13,12 @@ func main() {
 	builder.SetInsertionPoint(entry)
 
 	varA := lovm.Symbol{"a", lovm.Sequence(0)}
+	typ := lovm.IntType(32)
 
-	builder.Assign(varA, lovm.Const{"i32", "0"})
+	builder.Assign(varA, lovm.Const{typ, "0"})
 
-	op1 := builder.IAdd("i32", lovm.ConstInt("i32", 1), lovm.ConstInt("i32", 2))
-	op2 := builder.IAdd("i32", op1, lovm.ConstInt("i32", 3))
+	op1 := builder.IAdd(typ, lovm.ConstInt(typ, 1), lovm.ConstInt(typ, 2))
+	op2 := builder.IAdd(typ, op1, lovm.ConstInt(typ, 3))
 
 	builder.Assign(varA, op1)
 	builder.Assign(varA, op2)
@@ -26,17 +27,17 @@ func main() {
 	ifFalse := ctx.NewBlock()
 	endIf := ctx.NewBlock()
 
-	cnd := builder.ICmp("i32", "sgt", op2, lovm.ConstInt("i32", 4))
+	cnd := builder.ICmp(typ, "sgt", op2, lovm.ConstInt(typ, 4))
 	builder.BranchIf(cnd, ifTrue, ifFalse)
 	builder.SetInsertionPoint(ifTrue)
-	builder.Assign(varA, builder.IAdd("i32", op1, lovm.ConstInt("i32", 4)))
+	builder.Assign(varA, builder.IAdd(typ, op1, lovm.ConstInt(typ, 4)))
 	builder.Branch(endIf)
 
 	builder.SetInsertionPoint(ifFalse)
 	builder.Branch(endIf)
 
 	builder.SetInsertionPoint(endIf)
-	builder.Return("i32", builder.Ref("i32", varA))
+	builder.Return(typ, builder.Ref(typ, varA))
 
 	fmt.Printf("define i32 @main() {\n")
 	ctx.Emit()

@@ -56,7 +56,7 @@ func (v *Labelable) Prepare(ctx *Context) {
 type Binop struct {
 	Valuable
 	Instr string
-	Typ   string
+	Typ   Type
 	Op1   Value
 	Op2   Value
 }
@@ -72,18 +72,18 @@ type BranchIfOp struct {
 
 type ReturnOp struct {
 	Valuable
-	Typ    string
+	Typ    Type
 	Result Value
 }
 
 type Const struct {
-	Typ string
+	Typ Type
 	Val string
 }
 
 type RefOp struct {
 	Valuable
-	Typ string
+	Typ Type
 	Sym Register
 }
 
@@ -132,15 +132,15 @@ func (b PhiOp) Emit(ctx *Context) {
 	for _, phi := range b.Phis {
 		comps = append(comps, fmt.Sprintf("[ %s, %s ]", phi.Value, phi.Label))
 	}
-	ctx.Emitf("%s = phi %s %s", b.Name(), b.Typ, strings.Join(comps, ", "))
+	ctx.Emitf("%s = phi %s %s", b.Name(), b.Typ.Name, strings.Join(comps, ", "))
 }
 
-func ConstInt(typ string, value int) Const {
+func ConstInt(typ Type, value int) Const {
 	return Const{typ, fmt.Sprintf("%d", value)}
 }
 
 func (b *Binop) Emit(ctx *Context) {
-	ctx.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ, b.Op1.Name(), b.Op2.Name())
+	ctx.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name, b.Op1.Name(), b.Op2.Name())
 }
 
 func (b *BranchOp) Name() string {
@@ -160,7 +160,7 @@ func (b *BranchIfOp) Emit(ctx *Context) {
 }
 
 func (b *ReturnOp) Emit(ctx *Context) {
-	ctx.Emitf("ret %s %s", b.Typ, b.Result.Name())
+	ctx.Emitf("ret %s %s", b.Typ.Name, b.Result.Name())
 }
 
 func (b *Block) Add(value Value) Value {
@@ -210,7 +210,7 @@ func (b *Block) BranchIf(value Value, ifTrue, ifFalse *Block) {
 	b.Add(&BranchIfOp{BranchOp{[]*Block{ifTrue, ifFalse}}, value})
 }
 
-func (b *Block) Return(typ string, value Value) {
+func (b *Block) Return(typ Type, value Value) {
 	b.Add(value)
 	b.Add(&ReturnOp{Valuable{}, typ, value})
 }
