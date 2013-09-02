@@ -8,7 +8,7 @@ import (
 func main() {
 	ctx := lovm.NewContext(os.Stdout)
 	mod := ctx.NewModule()
-	fun := mod.NewFunction("@main", lovm.FunctionType(lovm.IntType(32), []lovm.Type{}))
+	fun := mod.NewFunction("@main", lovm.FunctionType(lovm.IntType(32)))
 	entry := fun.NewBlock()
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
@@ -40,6 +40,6 @@ func main() {
 	builder.SetInsertionPoint(endIf)
 	builder.Return(typ, builder.Ref(typ, varA))
 
-	//fmt.Printf("define i32 @main() {\n")
+	mod.DeclareExternal("@printf", lovm.FunctionType(lovm.IntType(32)))
 	ctx.Emit()
 }

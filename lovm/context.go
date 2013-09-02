@@ -15,9 +15,15 @@ func NewContext(w io.Writer) Context {
 	}
 }
 
+type External struct {
+	Name string
+	Type Type
+}
+
 type Module struct {
 	*Context
 	Functions []*Function
+	Externals []External
 }
 
 func (ctx *Context) NewModule() *Module {
@@ -51,11 +57,18 @@ func (mod *Module) NewFunction(name string, signature FuncType) *Function {
 	return fun
 }
 
+func (mod *Module) DeclareExternal(name string, signature Type) {
+	mod.Externals = append(mod.Externals, External{name, signature})
+}
+
 func (mod *Module) AddFunction(f *Function) {
 	mod.Functions = append(mod.Functions, f)
 }
 
 func (mod *Module) Emit() {
+	for _, e := range mod.Externals {
+		e.Type.EmitDecl(mod.Writer, e.Name)
+	}
 	for _, f := range mod.Functions {
 		f.Emit()
 	}
