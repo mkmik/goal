@@ -7,7 +7,8 @@ import (
 )
 
 func main() {
-	ctx := lovm.NewContext(os.Stdout)
+	context := lovm.NewContext(os.Stdout)
+	ctx := lovm.NewFunction(&context)
 	entry := ctx.NewBlock()
 	builder := ctx.NewBuilder()
 	builder.SetInsertionPoint(entry)

@@ -16,6 +16,6 @@ func (d DebugInstr) Name() string {
 	return "%debuginstr"
 }
 
-func (d DebugInstr) Emit(ctx *Context) {
+func (d DebugInstr) Emit(ctx *Function) {
 	ctx.Emitf("%s\n", d.Source)
 }

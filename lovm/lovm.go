@@ -12,12 +12,12 @@ type Block struct {
 	Values  []Value
 	Preds   []*Block
 	Vars    map[Register]Value
-	Context *Context
+	Context *Function
 }
 
 type Emitter interface {
-	Prepare(*Context, *Block)
-	Emit(*Context)
+	Prepare(*Function, *Block)
+	Emit(*Function)
 }
 
 type Value interface {
@@ -45,11 +45,11 @@ func (b Valuable) Name() string {
 	return fmt.Sprintf("%%%d", b.Res)
 }
 
-func (v *Valuable) Prepare(ctx *Context, b *Block) {
+func (v *Valuable) Prepare(ctx *Function, b *Block) {
 	v.Res = ctx.Tmps.Next()
 }
 
-func (v *Labelable) Prepare(ctx *Context) {
+func (v *Labelable) Prepare(ctx *Function) {
 	v.Res = ctx.Labels.Next()
 }
 
@@ -101,21 +101,21 @@ func (c Const) Name() string {
 	return c.Val
 }
 
-func (b Const) Emit(*Context) {
+func (b Const) Emit(*Function) {
 	// no instructions emitted for consts
 }
 
-func (b Const) Prepare(*Context, *Block) {
+func (b Const) Prepare(*Function, *Block) {
 	// no instructions emitted for consts
 }
 
-func (b RefOp) Emit(ctx *Context) {
+func (b RefOp) Emit(ctx *Function) {
 	if false {
 		log.Fatalf("RefOps have to be replaced during prepare")
 	}
 }
 
-func (r *RefOp) Prepare(ctx *Context, b *Block) {
+func (r *RefOp) Prepare(ctx *Function, b *Block) {
 	r.Valuable.Prepare(ctx, b)
 
 	phis := []PhiParam{}
@@ -127,7 +127,7 @@ func (r *RefOp) Prepare(ctx *Context, b *Block) {
 	b.Phis = append(b.Phis, &PhiOp{*r, phis})
 }
 
-func (b PhiOp) Emit(ctx *Context) {
+func (b PhiOp) Emit(ctx *Function) {
 	comps := []string{}
 	for _, phi := range b.Phis {
 		comps = append(comps, fmt.Sprintf("[ %s, %s ]", phi.Value, phi.Label))
@@ -139,7 +139,7 @@ func ConstInt(typ Type, value int) Const {
 	return Const{typ, fmt.Sprintf("%d", value)}
 }
 
-func (b *Binop) Emit(ctx *Context) {
+func (b *Binop) Emit(ctx *Function) {
 	ctx.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name, b.Op1.Name(), b.Op2.Name())
 }
 
@@ -148,18 +148,18 @@ func (b *BranchOp) Name() string {
 	return ""
 }
 
-func (b *BranchOp) Prepare(*Context, *Block) {
+func (b *BranchOp) Prepare(*Function, *Block) {
 }
 
-func (b *BranchOp) Emit(ctx *Context) {
+func (b *BranchOp) Emit(ctx *Function) {
 	ctx.Emitf("br label %s", b.Labels[0].Name())
 }
 
-func (b *BranchIfOp) Emit(ctx *Context) {
+func (b *BranchIfOp) Emit(ctx *Function) {
 	ctx.Emitf("br i1 %s, label %s, label %s", b.Cond.Name(), b.Labels[0].Name(), b.Labels[1].Name())
 }
 
-func (b *ReturnOp) Emit(ctx *Context) {
+func (b *ReturnOp) Emit(ctx *Function) {
 	ctx.Emitf("ret %s %s", b.Typ.Name, b.Result.Name())
 }
 
@@ -219,7 +219,7 @@ func (b *Block) Name() string {
 	return fmt.Sprintf("%%label%d", b.Res)
 }
 
-func (b *Block) Prepare(ctx *Context) {
+func (b *Block) Prepare(ctx *Function) {
 	b.Labelable.Prepare(ctx)
 	for _, v := range b.Values {
 		v.Prepare(ctx, b)
@@ -239,7 +239,7 @@ func (b *Block) PrettyPreds() string {
 	return strings.Join(res, ", ")
 }
 
-func (b *Block) Emit(ctx *Context) {
+func (b *Block) Emit(ctx *Function) {
 	preds := b.PrettyPreds()
 	ctx.Emitf("label%d:\t\t\t\t\t\t; preds = %s", b.Res, preds)
 	ctx.Indent = "  "
@@ -252,6 +252,6 @@ func (b *Block) Emit(ctx *Context) {
 	}
 }
 
-func NewBlock(ctx *Context) *Block {
+func NewBlock(ctx *Function) *Block {
 	return &Block{Context: ctx, Vars: map[Register]Value{}}
 }
