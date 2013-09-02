@@ -8,11 +8,11 @@ import (
 
 type Block struct {
 	Labelable
-	Phis    []Value
-	Values  []Value
-	Preds   []*Block
-	Vars    map[Register]Value
-	Context *Function
+	Phis     []Value
+	Values   []Value
+	Preds    []*Block
+	Vars     map[Register]Value
+	Function *Function
 }
 
 type Emitter interface {
@@ -45,12 +45,12 @@ func (b Valuable) Name() string {
 	return fmt.Sprintf("%%%d", b.Res)
 }
 
-func (v *Valuable) Prepare(ctx *Function, b *Block) {
-	v.Res = ctx.Tmps.Next()
+func (v *Valuable) Prepare(fun *Function, b *Block) {
+	v.Res = fun.Tmps.Next()
 }
 
-func (v *Labelable) Prepare(ctx *Function) {
-	v.Res = ctx.Labels.Next()
+func (v *Labelable) Prepare(fun *Function) {
+	v.Res = fun.Labels.Next()
 }
 
 type Binop struct {
@@ -109,14 +109,14 @@ func (b Const) Prepare(*Function, *Block) {
 	// no instructions emitted for consts
 }
 
-func (b RefOp) Emit(ctx *Function) {
+func (b RefOp) Emit(fun *Function) {
 	if false {
 		log.Fatalf("RefOps have to be replaced during prepare")
 	}
 }
 
-func (r *RefOp) Prepare(ctx *Function, b *Block) {
-	r.Valuable.Prepare(ctx, b)
+func (r *RefOp) Prepare(fun *Function, b *Block) {
+	r.Valuable.Prepare(fun, b)
 
 	phis := []PhiParam{}
 	for _, p := range b.Preds {
@@ -127,20 +127,20 @@ func (r *RefOp) Prepare(ctx *Function, b *Block) {
 	b.Phis = append(b.Phis, &PhiOp{*r, phis})
 }
 
-func (b PhiOp) Emit(ctx *Function) {
+func (b PhiOp) Emit(fun *Function) {
 	comps := []string{}
 	for _, phi := range b.Phis {
 		comps = append(comps, fmt.Sprintf("[ %s, %s ]", phi.Value, phi.Label))
 	}
-	ctx.Emitf("%s = phi %s %s", b.Name(), b.Typ.Name, strings.Join(comps, ", "))
+	fun.Emitf("%s = phi %s %s", b.Name(), b.Typ.Name, strings.Join(comps, ", "))
 }
 
 func ConstInt(typ Type, value int) Const {
 	return Const{typ, fmt.Sprintf("%d", value)}
 }
 
-func (b *Binop) Emit(ctx *Function) {
-	ctx.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name, b.Op1.Name(), b.Op2.Name())
+func (b *Binop) Emit(fun *Function) {
+	fun.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name, b.Op1.Name(), b.Op2.Name())
 }
 
 func (b *BranchOp) Name() string {
@@ -151,22 +151,22 @@ func (b *BranchOp) Name() string {
 func (b *BranchOp) Prepare(*Function, *Block) {
 }
 
-func (b *BranchOp) Emit(ctx *Function) {
-	ctx.Emitf("br label %s", b.Labels[0].Name())
+func (b *BranchOp) Emit(fun *Function) {
+	fun.Emitf("br label %s", b.Labels[0].Name())
 }
 
-func (b *BranchIfOp) Emit(ctx *Function) {
-	ctx.Emitf("br i1 %s, label %s, label %s", b.Cond.Name(), b.Labels[0].Name(), b.Labels[1].Name())
+func (b *BranchIfOp) Emit(fun *Function) {
+	fun.Emitf("br i1 %s, label %s, label %s", b.Cond.Name(), b.Labels[0].Name(), b.Labels[1].Name())
 }
 
-func (b *ReturnOp) Emit(ctx *Function) {
-	ctx.Emitf("ret %s %s", b.Typ.Name, b.Result.Name())
+func (b *ReturnOp) Emit(fun *Function) {
+	fun.Emitf("ret %s %s", b.Typ.Name, b.Result.Name())
 }
 
 func (b *Block) Add(value Value) Value {
-	if !b.Context.Values[value] {
+	if !b.Function.Values[value] {
 		b.Values = append(b.Values, value)
-		b.Context.Values[value] = true
+		b.Function.Values[value] = true
 	}
 	return value
 }
@@ -219,10 +219,10 @@ func (b *Block) Name() string {
 	return fmt.Sprintf("%%label%d", b.Res)
 }
 
-func (b *Block) Prepare(ctx *Function) {
-	b.Labelable.Prepare(ctx)
+func (b *Block) Prepare(fun *Function) {
+	b.Labelable.Prepare(fun)
 	for _, v := range b.Values {
-		v.Prepare(ctx, b)
+		v.Prepare(fun, b)
 	}
 	// insert phi nodes
 	for _, p := range b.Phis {
@@ -239,19 +239,19 @@ func (b *Block) PrettyPreds() string {
 	return strings.Join(res, ", ")
 }
 
-func (b *Block) Emit(ctx *Function) {
+func (b *Block) Emit(fun *Function) {
 	preds := b.PrettyPreds()
-	ctx.Emitf("label%d:\t\t\t\t\t\t; preds = %s", b.Res, preds)
-	ctx.Indent = "  "
+	fun.Emitf("label%d:\t\t\t\t\t\t; preds = %s", b.Res, preds)
+	fun.Indent = "  "
 	defer func() {
-		ctx.Indent = ""
+		fun.Indent = ""
 	}()
 
 	for _, v := range b.Values {
-		v.Emit(ctx)
+		v.Emit(fun)
 	}
 }
 
-func NewBlock(ctx *Function) *Block {
-	return &Block{Context: ctx, Vars: map[Register]Value{}}
+func NewBlock(fun *Function) *Block {
+	return &Block{Function: fun, Vars: map[Register]Value{}}
 }

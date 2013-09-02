@@ -30,24 +30,24 @@ func (s *Sequence) Next() Sequence {
 	return res
 }
 
-func (ctx *Function) NewBlock() *Block {
-	res := NewBlock(ctx)
-	ctx.Blocks = append(ctx.Blocks, res)
+func (fun *Function) NewBlock() *Block {
+	res := NewBlock(fun)
+	fun.Blocks = append(fun.Blocks, res)
 	return res
 }
 
-func (ctx *Function) Emitf(format string, args ...interface{}) {
-	io.WriteString(ctx.Writer, ctx.Indent)
-	fmt.Fprintf(ctx.Writer, format, args...)
-	io.WriteString(ctx.Writer, "\n")
+func (fun *Function) Emitf(format string, args ...interface{}) {
+	io.WriteString(fun.Writer, fun.Indent)
+	fmt.Fprintf(fun.Writer, format, args...)
+	io.WriteString(fun.Writer, "\n")
 }
 
-func (ctx *Function) Emit() {
-	for _, b := range ctx.Blocks {
-		b.Prepare(ctx)
+func (fun *Function) Emit() {
+	for _, b := range fun.Blocks {
+		b.Prepare(fun)
 	}
 
-	for _, b := range ctx.Blocks {
-		b.Emit(ctx)
+	for _, b := range fun.Blocks {
+		b.Emit(fun)
 	}
 }

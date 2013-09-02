@@ -8,9 +8,9 @@ import (
 
 func main() {
 	context := lovm.NewContext(os.Stdout)
-	ctx := lovm.NewFunction(&context)
-	entry := ctx.NewBlock()
-	builder := ctx.NewBuilder()
+	fun := lovm.NewFunction(&context)
+	entry := fun.NewBlock()
+	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
 
 	varA := lovm.Symbol{"a", lovm.Sequence(0)}
@@ -24,9 +24,9 @@ func main() {
 	builder.Assign(varA, op1)
 	builder.Assign(varA, op2)
 
-	ifTrue := ctx.NewBlock()
-	ifFalse := ctx.NewBlock()
-	endIf := ctx.NewBlock()
+	ifTrue := fun.NewBlock()
+	ifFalse := fun.NewBlock()
+	endIf := fun.NewBlock()
 
 	cnd := builder.ICmp(typ, "sgt", op2, lovm.ConstInt(typ, 4))
 	builder.BranchIf(cnd, ifTrue, ifFalse)
