@@ -11,7 +11,7 @@ type Block struct {
 	Phis    []Value
 	Values  []Value
 	Preds   []*Block
-	Vars    map[Symbol]Value
+	Vars    map[Register]Value
 	Context *Context
 }
 
@@ -28,6 +28,9 @@ type Value interface {
 type Symbol struct {
 	Name  string
 	Scope Sequence
+}
+
+type Register interface {
 }
 
 type Valuable struct {
@@ -81,7 +84,7 @@ type Const struct {
 type RefOp struct {
 	Valuable
 	Typ string
-	Sym Symbol
+	Sym Register
 }
 
 type PhiParam struct {
@@ -160,14 +163,15 @@ func (b *ReturnOp) Emit(ctx *Context) {
 	ctx.Emitf("ret %s %s", b.Typ, b.Result.Name())
 }
 
-func (b *Block) Add(value Value) {
+func (b *Block) Add(value Value) Value {
 	if !b.Context.Values[value] {
 		b.Values = append(b.Values, value)
 		b.Context.Values[value] = true
 	}
+	return value
 }
 
-func (b *Block) ResolveVar(symbol Symbol) (Value, bool) {
+func (b *Block) ResolveVar(symbol Register) (Value, bool) {
 	if v, ok := b.Vars[symbol]; ok {
 		return v, ok
 	}
@@ -179,9 +183,10 @@ func (b *Block) ResolveVar(symbol Symbol) (Value, bool) {
 	return nil, false
 }
 
-func (b *Block) Assign(symbol Symbol, value Value) {
-	b.Add(value)
+func (b *Block) Assign(symbol Register, value Value) Value {
+	res := b.Add(value)
 	b.Vars[symbol] = value
+	return res
 }
 
 func (b *Block) AddPred(source *Block) {
@@ -248,5 +253,5 @@ func (b *Block) Emit(ctx *Context) {
 }
 
 func NewBlock(ctx *Context) *Block {
-	return &Block{Context: ctx, Vars: map[Symbol]Value{}}
+	return &Block{Context: ctx, Vars: map[Register]Value{}}
 }
