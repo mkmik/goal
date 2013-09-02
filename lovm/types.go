@@ -2,8 +2,8 @@ package lovm
 
 import (
 	"fmt"
-	"strings"
 	"io"
+	"strings"
 )
 
 type Type interface {
@@ -35,8 +35,9 @@ func IntType(size int) Type {
 }
 
 type FuncType struct {
-	ReturnType   string
-	ParamTypes   []string
+	ReturnType string
+	ParamTypes []string
+	Variadic   bool
 }
 
 func (f FuncType) Name() string {
@@ -44,7 +45,13 @@ func (f FuncType) Name() string {
 }
 
 func (f FuncType) funcDecl(name string) string {
-	return fmt.Sprintf("%s %s(%s)", f.ReturnType, name, strings.Join(f.ParamTypes, ", "))
+	args := make([]string, len(f.ParamTypes))
+	copy(args, f.ParamTypes)
+	if f.Variadic {
+		args = append(args, "...")
+	}
+
+	return fmt.Sprintf("%s %s(%s)", f.ReturnType, name, strings.Join(args, ", "))
 }
 
 func (f FuncType) EmitDecl(w io.Writer, name string) {
@@ -57,14 +64,15 @@ func (f FuncType) EmitDef(w io.Writer, name string, body func()) {
 	fmt.Fprintf(w, "}\n")
 }
 
-func FunctionType(ret Type, params ...Type) FuncType {
+func FunctionType(ret Type, variadic bool, params ...Type) FuncType {
 	paramTypes := make([]string, len(params))
 	for i, p := range params {
 		paramTypes[i] = p.Name()
 	}
 	return FuncType{
-		ReturnType:   ret.Name(),
-		ParamTypes:   paramTypes,
+		ReturnType: ret.Name(),
+		ParamTypes: paramTypes,
+		Variadic:   variadic,
 	}
 }
 
