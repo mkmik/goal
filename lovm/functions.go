@@ -15,6 +15,8 @@ type Function struct {
 
 	Blocks []*Block
 	Values map[Value]bool
+	Type   Type
+	Name   string
 }
 
 func (s *Sequence) Next() Sequence {
@@ -36,6 +38,7 @@ func (fun *Function) Emitf(format string, args ...interface{}) {
 }
 
 func (fun *Function) Emit() {
+	fmt.Fprintf(fun.Writer, "define %s {\n", fun.Type.Decl)
 	for _, b := range fun.Blocks {
 		b.Prepare(fun)
 	}
@@ -43,4 +46,6 @@ func (fun *Function) Emit() {
 	for _, b := range fun.Blocks {
 		b.Emit(fun)
 	}
+
+	fmt.Fprintf(fun.Writer, "}\n")
 }

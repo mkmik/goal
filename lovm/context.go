@@ -39,10 +39,12 @@ func (ctx *Context) Emit() {
 	}
 }
 
-func (mod *Module) NewFunction() *Function {
+func (mod *Module) NewFunction(name string, signature Type) *Function {
 	fun := &Function{
 		Module: mod,
 		Values: map[Value]bool{},
+		Type: signature,
+		Name: name,
 	}
 
 	mod.AddFunction(fun)

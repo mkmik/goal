@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"goal/lovm"
 	"os"
 )
@@ -9,7 +8,7 @@ import (
 func main() {
 	ctx := lovm.NewContext(os.Stdout)
 	mod := ctx.NewModule()
-	fun := mod.NewFunction()
+	fun := mod.NewFunction("@main", lovm.FunctionType("@main", lovm.IntType(32), []lovm.Type{}))
 	entry := fun.NewBlock()
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
@@ -41,7 +40,6 @@ func main() {
 	builder.SetInsertionPoint(endIf)
 	builder.Return(typ, builder.Ref(typ, varA))
 
-	fmt.Printf("define i32 @main() {\n")
+	//fmt.Printf("define i32 @main() {\n")
 	ctx.Emit()
-	fmt.Printf("}\n")
 }
