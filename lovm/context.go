@@ -5,8 +5,8 @@ import (
 )
 
 type Context struct {
-	Writer io.Writer
-	Modules []Module
+	Writer  io.Writer
+	Modules []*Module
 }
 
 func NewContext(w io.Writer) Context {
@@ -17,17 +17,44 @@ func NewContext(w io.Writer) Context {
 
 type Module struct {
 	*Context
-	functions []Function
+	Functions []*Function
 }
 
-fun (ctx *Context) Emit() {
+func (ctx *Context) NewModule() *Module {
+	mod := &Module{
+		Context: ctx,
+	}
+
+	ctx.AddModule(mod)
+	return mod
+}
+
+func (ctx *Context) AddModule(m *Module) {
+	ctx.Modules = append(ctx.Modules, m)
+}
+
+func (ctx *Context) Emit() {
 	for _, m := range ctx.Modules {
 		m.Emit()
 	}
 }
 
-fun (ctx *Module) Emit() {
-	for _, f := range ctx.Functions {
+func (mod *Module) NewFunction() *Function {
+	fun := &Function{
+		Module: mod,
+		Values: map[Value]bool{},
+	}
+
+	mod.AddFunction(fun)
+	return fun
+}
+
+func (mod *Module) AddFunction(f *Function) {
+	mod.Functions = append(mod.Functions, f)
+}
+
+func (mod *Module) Emit() {
+	for _, f := range mod.Functions {
 		f.Emit()
 	}
 }

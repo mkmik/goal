@@ -7,8 +7,9 @@ import (
 )
 
 func main() {
-	context := lovm.NewContext(os.Stdout)
-	fun := lovm.NewFunction(&context)
+	ctx := lovm.NewContext(os.Stdout)
+	mod := ctx.NewModule()
+	fun := mod.NewFunction()
 	entry := fun.NewBlock()
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)

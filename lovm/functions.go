@@ -8,20 +8,13 @@ import (
 type Sequence int
 
 type Function struct {
-	*Context
+	*Module
 	Indent string
 	Tmps   Sequence
 	Labels Sequence
 
 	Blocks []*Block
 	Values map[Value]bool
-}
-
-func NewFunction(ctx *Context) Function {
-	return Function{
-		Context: ctx,
-		Values:  map[Value]bool{},
-	}
 }
 
 func (s *Sequence) Next() Sequence {
