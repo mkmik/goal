@@ -132,7 +132,7 @@ func (b PhiOp) Emit(fun *Function) {
 	for _, phi := range b.Phis {
 		comps = append(comps, fmt.Sprintf("[ %s, %s ]", phi.Value, phi.Label))
 	}
-	fun.Emitf("%s = phi %s %s", b.Name(), b.Typ.Name, strings.Join(comps, ", "))
+	fun.Emitf("%s = phi %s %s", b.Name(), b.Typ.Name(), strings.Join(comps, ", "))
 }
 
 func ConstInt(typ Type, value int) Const {
@@ -140,7 +140,7 @@ func ConstInt(typ Type, value int) Const {
 }
 
 func (b *Binop) Emit(fun *Function) {
-	fun.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name, b.Op1.Name(), b.Op2.Name())
+	fun.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name(), b.Op1.Name(), b.Op2.Name())
 }
 
 func (b *BranchOp) Name() string {
@@ -160,7 +160,7 @@ func (b *BranchIfOp) Emit(fun *Function) {
 }
 
 func (b *ReturnOp) Emit(fun *Function) {
-	fun.Emitf("ret %s %s", b.Typ.Name, b.Result.Name())
+	fun.Emitf("ret %s %s", b.Typ.Name(), b.Result.Name())
 }
 
 func (b *Block) Add(value Value) Value {

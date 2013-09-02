@@ -15,7 +15,7 @@ type Function struct {
 
 	Blocks []*Block
 	Values map[Value]bool
-	Type   Type
+	Type   FuncType
 	Name   string
 }
 
@@ -38,7 +38,7 @@ func (fun *Function) Emitf(format string, args ...interface{}) {
 }
 
 func (fun *Function) Emit() {
-	fmt.Fprintf(fun.Writer, "define %s {\n", fun.Type.Decl)
+	fmt.Fprintf(fun.Writer, "define %s {\n", fun.Type.Decl(fun.Name))
 	for _, b := range fun.Blocks {
 		b.Prepare(fun)
 	}

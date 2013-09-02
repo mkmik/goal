@@ -5,26 +5,46 @@ import (
 	"strings"
 )
 
-type Type struct {
-	Name string
-	Decl string
+type Type interface {
+	Name() string
+}
+
+type BasicType struct {
+	name string
+}
+
+func (b BasicType) Name() string {
+	return b.name
 }
 
 func IntType(size int) Type {
-	return Type{Name: fmt.Sprintf("i%d", size)}
+	return BasicType{fmt.Sprintf("i%d", size)}
 }
 
-func FunctionType(name string, ret Type, params []Type) Type {
-	paramNames := make([]string, len(params))
+type FuncType struct {
+	ReturnType   string
+	ParamTypes   []string
+}
+
+func (f FuncType) Name() string {
+	return fmt.Sprintf("%s (%s)", f.ReturnType, strings.Join(f.ParamTypes, ", "))
+}
+
+func (f FuncType) Decl(name string) string {
+	return fmt.Sprintf("%s %s(%s)", f.ReturnType, name, strings.Join(f.ParamTypes, ", "))
+}
+
+func FunctionType(ret Type, params []Type) FuncType {
+	paramTypes := make([]string, len(params))
 	for i, p := range params {
-		paramNames[i] = p.Name
+		paramTypes[i] = p.Name()
 	}
-	return Type{
-		Name: fmt.Sprintf("%s (%s)", ret.Name, strings.Join(paramNames, ", ")),
-		Decl: fmt.Sprintf("%s %s(%s)", ret.Name, name, strings.Join(paramNames, ", ")),
+	return FuncType{
+		ReturnType:   ret.Name(),
+		ParamTypes:   paramTypes,
 	}
 }
 
 func PointerType(typ Type) Type {
-	return Type{Name: fmt.Sprintf("%s *", typ.Name)}
+	return BasicType{fmt.Sprintf("%s *", typ.Name())}
 }

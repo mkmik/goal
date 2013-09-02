@@ -8,7 +8,7 @@ import (
 func main() {
 	ctx := lovm.NewContext(os.Stdout)
 	mod := ctx.NewModule()
-	fun := mod.NewFunction("@main", lovm.FunctionType("@main", lovm.IntType(32), []lovm.Type{}))
+	fun := mod.NewFunction("@main", lovm.FunctionType(lovm.IntType(32), []lovm.Type{}))
 	entry := fun.NewBlock()
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
