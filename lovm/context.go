@@ -33,15 +33,17 @@ type Constant interface {
 
 type Module struct {
 	*Context
+	Name      string
 	Functions []*Function
 	Externals []External
 	Globals   []Global
 	Interned  Sequence
 }
 
-func (ctx *Context) NewModule() *Module {
+func (ctx *Context) NewModule(name string) *Module {
 	mod := &Module{
 		Context: ctx,
+		Name:    name,
 	}
 
 	ctx.AddModule(mod)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strconv"
 	"strings"
 )
 
@@ -190,8 +191,16 @@ func (b PhiOp) Emit(fun *Function) {
 	fun.Emitf("%s = phi %s %s", b.Name(), b.Typ.Name(), strings.Join(comps, ", "))
 }
 
-func ConstInt(typ Type, value int) Const {
+func ConstInt(typ Type, value int64) Const {
 	return Const{typ, fmt.Sprintf("%d", value)}
+}
+
+func ConstIntFromString(typ Type, value string, base int) Const {
+	num, err := strconv.ParseInt(value, base, 64)
+	if err != nil {
+		panic(fmt.Errorf("Cannot parse integer: '%s'", value))
+	}
+	return ConstInt(typ, num)
 }
 
 func (mod *Module) ConstString(value string) Value {

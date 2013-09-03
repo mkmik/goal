@@ -12,7 +12,7 @@ type Symbol struct {
 
 func main() {
 	ctx := lovm.NewContext(os.Stdout)
-	mod := ctx.NewModule()
+	mod := ctx.NewModule("main")
 	fun := mod.NewFunction("@main", lovm.FunctionType(lovm.IntType(32), false))
 	entry := fun.NewBlock()
 	builder := fun.NewBuilder()
@@ -33,7 +33,7 @@ func main() {
 	ifFalse := fun.NewBlock()
 	endIf := fun.NewBlock()
 
-	cnd := builder.ICmp(typ, "sgt", op2, lovm.ConstInt(typ, 4))
+	cnd := builder.ICmp(typ, lovm.IntSGT, op2, lovm.ConstIntFromString(typ, "B", 16))
 	builder.BranchIf(cnd, ifTrue, ifFalse)
 	builder.SetInsertionPoint(ifTrue)
 	builder.Assign(varA, builder.IAdd(typ, op1, lovm.ConstInt(typ, 4)))

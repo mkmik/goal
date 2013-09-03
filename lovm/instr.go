@@ -4,8 +4,25 @@ import (
 	"fmt"
 )
 
+const (
+	IntSLT = "slt"
+	IntSGT = "sgt"
+)
+
 func (b *Builder) IAdd(typ Type, op1, op2 Value) Value {
 	return b.Add(&Binop{Valuable{Typ: typ}, "add", op1, op2})
+}
+
+func (b *Builder) IMul(typ Type, op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: typ}, "mul", op1, op2})
+}
+
+func (b *Builder) ISDiv(typ Type, op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: typ}, "sdiv", op1, op2})
+}
+
+func (b *Builder) ISRem(typ Type, op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: typ}, "srem", op1, op2})
 }
 
 func (b *Builder) ICmp(typ Type, op string, op1, op2 Value) Value {
