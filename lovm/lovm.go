@@ -310,9 +310,9 @@ func (b *Block) BranchIf(value Value, ifTrue, ifFalse *Block) {
 	b.Add(&BranchIfOp{BranchOp{[]*Block{ifTrue, ifFalse}}, value})
 }
 
-func (b *Block) Return(typ Type, value Value) {
+func (b *Block) Return(value Value) {
 	b.Add(value)
-	b.Add(&ReturnOp{Valuable{Typ: typ}, value})
+	b.Add(&ReturnOp{Valuable{Typ: value.Type()}, value})
 }
 
 func (b *Block) Name() string {

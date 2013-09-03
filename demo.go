@@ -25,8 +25,8 @@ func main() {
 
 	param := fun.Param(0)
 
-	op1 := builder.IAdd(typ, lovm.ConstInt(typ, 1), param)
-	op2 := builder.IAdd(typ, op1, lovm.ConstInt(typ, 3))
+	op1 := builder.IAdd(lovm.ConstInt(typ, 1), param)
+	op2 := builder.IAdd(op1, lovm.ConstInt(typ, 3))
 
 	builder.Assign(varA, op1)
 	builder.Assign(varA, op2)
@@ -35,10 +35,10 @@ func main() {
 	ifFalse := fun.NewBlock()
 	endIf := fun.NewBlock()
 
-	cnd := builder.ICmp(typ, lovm.IntSGT, op2, lovm.ConstIntFromString(typ, "B", 16))
+	cnd := builder.ICmp(lovm.IntSGT, op2, lovm.ConstIntFromString(typ, "B", 16))
 	builder.BranchIf(cnd, ifTrue, ifFalse)
 	builder.SetInsertionPoint(ifTrue)
-	builder.Assign(varA, builder.IAdd(typ, op1, lovm.ConstInt(typ, 4)))
+	builder.Assign(varA, builder.IAdd(op1, lovm.ConstInt(typ, 4)))
 	builder.Branch(endIf)
 
 	builder.SetInsertionPoint(ifFalse)
@@ -50,8 +50,8 @@ func main() {
 	printfSym := mod.DeclareExternal("@printf", printfType)
 	a := builder.Ref(typ, varA)
 	str := mod.ConstString("hello world\n")
-	builder.Call(printfSym.Type(), printfSym.Name(), builder.GEP(str.Type(), str, 0, 0), a)
-	builder.Return(typ, a)
+	builder.Call(printfSym.Type(), printfSym.Name(), builder.GEP(str, 0, 0), a)
+	builder.Return(a)
 
 	ctx.Emit()
 }

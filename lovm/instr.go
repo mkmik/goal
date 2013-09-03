@@ -9,24 +9,24 @@ const (
 	IntSGT = "sgt"
 )
 
-func (b *Builder) IAdd(typ Type, op1, op2 Value) Value {
-	return b.Add(&Binop{Valuable{Typ: typ}, "add", op1, op2})
+func (b *Builder) IAdd(op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "add", op1, op2})
 }
 
-func (b *Builder) IMul(typ Type, op1, op2 Value) Value {
-	return b.Add(&Binop{Valuable{Typ: typ}, "mul", op1, op2})
+func (b *Builder) IMul(op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "mul", op1, op2})
 }
 
-func (b *Builder) ISDiv(typ Type, op1, op2 Value) Value {
-	return b.Add(&Binop{Valuable{Typ: typ}, "sdiv", op1, op2})
+func (b *Builder) ISDiv(op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "sdiv", op1, op2})
 }
 
-func (b *Builder) ISRem(typ Type, op1, op2 Value) Value {
-	return b.Add(&Binop{Valuable{Typ: typ}, "srem", op1, op2})
+func (b *Builder) ISRem(op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "srem", op1, op2})
 }
 
-func (b *Builder) ICmp(typ Type, op string, op1, op2 Value) Value {
-	return b.Add(&Binop{Valuable{Typ: typ}, fmt.Sprintf("icmp %s", op), op1, op2})
+func (b *Builder) ICmp(op string, op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: op1.Type()}, fmt.Sprintf("icmp %s", op), op1, op2})
 }
 
 func (b *Builder) Ref(typ Type, sym Register) Value {
@@ -37,6 +37,6 @@ func (b *Builder) Call(typ Type, fun string, args ...Value) Value {
 	return b.Add(&CallOp{Valuable{Typ: typ}, fun, args})
 }
 
-func (b *Builder) GEP(typ Type, base Value, indices ...int) Value {
-	return b.Add(&GEPOp{Valuable{Typ: DereferenceTypes(typ, indices...)}, base, indices})
+func (b *Builder) GEP(base Value, indices ...int) Value {
+	return b.Add(&GEPOp{Valuable{Typ: DereferenceTypes(base.Type(), indices...)}, base, indices})
 }

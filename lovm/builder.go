@@ -5,7 +5,7 @@ type Adder interface {
 	Assign(Register, Value) Value
 	Branch(*Block)
 	BranchIf(value Value, ifTrue, ifFalse *Block)
-	Return(Type, Value)
+	Return(Value)
 }
 
 type Builder struct {
