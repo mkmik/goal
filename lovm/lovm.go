@@ -87,6 +87,12 @@ type CallOp struct {
 	Args []Value
 }
 
+type GEPOp struct {
+	Valuable
+	Base    Value
+	Indices []int
+}
+
 type Const struct {
 	Typ Type
 	Val string
@@ -140,6 +146,15 @@ func (b *CallOp) Emit(fun *Function) {
 	fun.Emitf("%s = call %s %s(%s)", b.Name(), b.Typ.Name(), b.Fun, strings.Join(args, ", "))
 }
 
+func (b *GEPOp) Emit(fun *Function) {
+	args := []string{}
+	for _, i := range b.Indices {
+		args = append(args, fmt.Sprintf("i64 %d", i))
+	}
+
+	fun.Emitf("%s = getelementptr %s %s, %s", b.Name(), b.Base.Type().Name(), b.Base.Name(), strings.Join(args, ", "))
+}
+
 func (c Const) Name() string {
 	return c.Val
 }
@@ -186,10 +201,10 @@ func ConstInt(typ Type, value int) Const {
 
 func (mod *Module) ConstString(value string) Value {
 	name := fmt.Sprintf("@.str%d", mod.Interned.Next())
-	typ := PointerType(IntType(8))
+	typ := ArrayType(IntType(8), len(value)+1)
 	init := StringInitializer{value}
 	mod.Globals = append(mod.Globals, Global{Name: name, Type: typ, Init: init})
-	return SymRef{name, typ}
+	return SymRef{name, PointerType(typ)}
 }
 
 // TODO(mkm): generalize

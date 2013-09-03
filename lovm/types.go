@@ -8,16 +8,25 @@ import (
 
 type Type interface {
 	Name() string
+	Dereference() Type
 	EmitDecl(w io.Writer, name string)
 	EmitDef(w io.Writer, name string, body func())
 }
 
 type BasicType struct {
 	name string
+	Base Type
 }
 
 func (b BasicType) Name() string {
 	return b.name
+}
+
+func (b BasicType) Dereference() Type {
+	if b.Base == nil {
+		panic(fmt.Errorf("dereferencing a non reference type: %v", b.Name()))
+	}
+	return b.Base
 }
 
 func (b BasicType) EmitDecl(w io.Writer, name string) {
@@ -31,7 +40,7 @@ func (b BasicType) EmitDef(w io.Writer, name string, body func()) {
 }
 
 func IntType(size int) Type {
-	return BasicType{fmt.Sprintf("i%d", size)}
+	return BasicType{fmt.Sprintf("i%d", size), nil}
 }
 
 type FuncType struct {
@@ -42,6 +51,10 @@ type FuncType struct {
 
 func (f FuncType) Name() string {
 	return f.funcDecl("")
+}
+
+func (b FuncType) Dereference() Type {
+	panic("dereferencing a non reference type")
 }
 
 func (f FuncType) funcDecl(name string) string {
@@ -77,9 +90,21 @@ func FunctionType(ret Type, variadic bool, params ...Type) FuncType {
 }
 
 func PointerType(typ Type) Type {
-	return BasicType{fmt.Sprintf("%s *", typ.Name())}
+	return BasicType{fmt.Sprintf("%s *", typ.Name()), typ}
+}
+
+func ArrayType(typ Type, size int) Type {
+	return BasicType{fmt.Sprintf("[%d x %s]", size, typ.Name()), PointerType(typ)}
 }
 
 func VoidType() Type {
-	return BasicType{"void"}
+	return BasicType{"void", nil}
+}
+
+func DereferenceTypes(base Type, indices ...int) Type {
+	if len(indices) > 0 {
+		return DereferenceTypes(base.Dereference(), indices[1:]...)
+	} else {
+		return base
+	}
 }
