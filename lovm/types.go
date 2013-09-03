@@ -44,8 +44,8 @@ func IntType(size int) Type {
 }
 
 type FuncType struct {
-	ReturnType string
-	ParamTypes []string
+	ReturnType Type
+	ParamTypes []Type
 	Variadic   bool
 }
 
@@ -59,12 +59,14 @@ func (b FuncType) Dereference() Type {
 
 func (f FuncType) funcDecl(name string) string {
 	args := make([]string, len(f.ParamTypes))
-	copy(args, f.ParamTypes)
+	for i, p := range f.ParamTypes {
+		args[i] = p.Name()
+	}
 	if f.Variadic {
 		args = append(args, "...")
 	}
 
-	return fmt.Sprintf("%s %s(%s)", f.ReturnType, name, strings.Join(args, ", "))
+	return fmt.Sprintf("%s %s(%s)", f.ReturnType.Name(), name, strings.Join(args, ", "))
 }
 
 func (f FuncType) EmitDecl(w io.Writer, name string) {
@@ -78,13 +80,9 @@ func (f FuncType) EmitDef(w io.Writer, name string, body func()) {
 }
 
 func FunctionType(ret Type, variadic bool, params ...Type) FuncType {
-	paramTypes := make([]string, len(params))
-	for i, p := range params {
-		paramTypes[i] = p.Name()
-	}
 	return FuncType{
-		ReturnType: ret.Name(),
-		ParamTypes: paramTypes,
+		ReturnType: ret,
+		ParamTypes: params,
 		Variadic:   variadic,
 	}
 }

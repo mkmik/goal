@@ -15,8 +15,29 @@ type Function struct {
 
 	Blocks []*Block
 	Values map[Value]bool
+	Params []*Param
 	Type   FuncType
 	Name   string
+}
+
+func (mod *Module) NewFunction(name string, typ Type) *Function {
+	signature := typ.(FuncType)
+	fun := &Function{
+		Module: mod,
+		Values: map[Value]bool{},
+		Type:   signature,
+		Name:   name,
+	}
+
+	mod.AddFunction(fun)
+	paramBlock := NewBlock(fun)
+	for _, paramType := range signature.ParamTypes {
+		param := &Param{Valuable{}, paramType}
+		fun.Params = append(fun.Params, param)
+		paramBlock.Add(param)
+	}
+	paramBlock.Prepare(fun)
+	return fun
 }
 
 func (s *Sequence) Next() Sequence {
@@ -29,6 +50,10 @@ func (fun *Function) NewBlock() *Block {
 	res := NewBlock(fun)
 	fun.Blocks = append(fun.Blocks, res)
 	return res
+}
+
+func (fun *Function) Param(idx int) Value {
+	return fun.Params[idx]
 }
 
 func (fun *Function) Emitf(format string, args ...interface{}) {

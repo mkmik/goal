@@ -13,7 +13,7 @@ type Symbol struct {
 func main() {
 	ctx := lovm.NewContext(os.Stdout)
 	mod := ctx.NewModule("main")
-	fun := mod.NewFunction("@main", lovm.FunctionType(lovm.IntType(32), false))
+	fun := mod.NewFunction("@main", lovm.FunctionType(lovm.IntType(32), false, lovm.IntType(32), lovm.PointerType(lovm.PointerType(lovm.IntType(8)))))
 	entry := fun.NewBlock()
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
@@ -23,7 +23,9 @@ func main() {
 
 	builder.Assign(varA, lovm.Const{typ, "0"})
 
-	op1 := builder.IAdd(typ, lovm.ConstInt(typ, 1), lovm.ConstInt(typ, 2))
+	param := fun.Param(0)
+
+	op1 := builder.IAdd(typ, lovm.ConstInt(typ, 1), param)
 	op2 := builder.IAdd(typ, op1, lovm.ConstInt(typ, 3))
 
 	builder.Assign(varA, op1)

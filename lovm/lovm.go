@@ -89,6 +89,11 @@ type GEPOp struct {
 	Indices []int
 }
 
+type Param struct {
+	Valuable
+	Typ Type
+}
+
 type Const struct {
 	Typ Type
 	Val string
@@ -149,6 +154,10 @@ func (b *GEPOp) Emit(fun *Function) {
 	}
 
 	fun.Emitf("%s = getelementptr %s %s, %s", b.Name(), b.Base.Type().Name(), b.Base.Name(), strings.Join(args, ", "))
+}
+
+func (b Param) Emit(*Function) {
+	// no instructions emitted for param
 }
 
 func (c Const) Name() string {

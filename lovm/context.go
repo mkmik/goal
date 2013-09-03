@@ -60,18 +60,6 @@ func (ctx *Context) Emit() {
 	}
 }
 
-func (mod *Module) NewFunction(name string, signature FuncType) *Function {
-	fun := &Function{
-		Module: mod,
-		Values: map[Value]bool{},
-		Type:   signature,
-		Name:   name,
-	}
-
-	mod.AddFunction(fun)
-	return fun
-}
-
 func (mod *Module) DeclareExternal(name string, signature Type) SymRef {
 	mod.Externals = append(mod.Externals, External{name, signature})
 	return SymRef{name, PointerType(signature)}
