@@ -5,6 +5,11 @@ import (
 	"os"
 )
 
+type Symbol struct {
+	Name  string
+	Scope lovm.Sequence
+}
+
 func main() {
 	ctx := lovm.NewContext(os.Stdout)
 	mod := ctx.NewModule()
@@ -13,7 +18,7 @@ func main() {
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
 
-	varA := lovm.Symbol{"a", lovm.Sequence(0)}
+	varA := Symbol{"a", lovm.Sequence(0)}
 	typ := lovm.IntType(32)
 
 	builder.Assign(varA, lovm.Const{typ, "0"})

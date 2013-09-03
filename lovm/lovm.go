@@ -27,11 +27,6 @@ type Value interface {
 	Type() Type
 }
 
-type Symbol struct {
-	Name  string
-	Scope Sequence
-}
-
 type Register interface {
 }
 
