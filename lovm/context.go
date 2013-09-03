@@ -70,8 +70,9 @@ func (mod *Module) NewFunction(name string, signature FuncType) *Function {
 	return fun
 }
 
-func (mod *Module) DeclareExternal(name string, signature Type) {
+func (mod *Module) DeclareExternal(name string, signature Type) SymRef {
 	mod.Externals = append(mod.Externals, External{name, signature})
+	return SymRef{name, PointerType(signature)}
 }
 
 func (mod *Module) AddFunction(f *Function) {

@@ -17,7 +17,7 @@ func (b *Builder) Ref(typ Type, sym Symbol) Value {
 }
 
 func (b *Builder) Call(typ Type, fun string, args ...Value) Value {
-	return b.Add(&CallOp{Valuable{Typ: PointerType(typ)}, fun, args})
+	return b.Add(&CallOp{Valuable{Typ: typ}, fun, args})
 }
 
 func (b *Builder) GEP(typ Type, base Value, indices ...int) Value {

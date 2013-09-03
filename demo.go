@@ -40,11 +40,11 @@ func main() {
 	builder.SetInsertionPoint(endIf)
 
 	printfType := lovm.FunctionType(lovm.IntType(32), true, lovm.PointerType(lovm.IntType(8)))
+	printfSym := mod.DeclareExternal("@printf", printfType)
 	a := builder.Ref(typ, varA)
 	str := mod.ConstString("hello world\n")
-	builder.Call(printfType, "@printf", builder.GEP(str.Type(), str, 0, 0), a)
+	builder.Call(printfSym.Type(), printfSym.Name(), builder.GEP(str.Type(), str, 0, 0), a)
 	builder.Return(typ, a)
 
-	mod.DeclareExternal("@printf", printfType)
 	ctx.Emit()
 }
