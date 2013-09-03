@@ -20,10 +20,23 @@ type External struct {
 	Type Type
 }
 
+type Global struct {
+	Name  string
+	Type  Type
+	Attrs []string
+	Init  Constant
+}
+
+type Constant interface {
+	Emit(w io.Writer)
+}
+
 type Module struct {
 	*Context
 	Functions []*Function
 	Externals []External
+	Globals   []Global
+	Interned  Sequence
 }
 
 func (ctx *Context) NewModule() *Module {
@@ -68,6 +81,11 @@ func (mod *Module) AddFunction(f *Function) {
 func (mod *Module) Emit() {
 	for _, e := range mod.Externals {
 		e.Type.EmitDecl(mod.Writer, e.Name)
+	}
+	for _, g := range mod.Globals {
+		g.Type.EmitDef(mod.Writer, g.Name, func() {
+			g.Init.Emit(mod.Writer)
+		})
 	}
 	for _, f := range mod.Functions {
 		f.Emit()

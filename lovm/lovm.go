@@ -2,6 +2,7 @@ package lovm
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 )
@@ -106,6 +107,31 @@ type PhiOp struct {
 	Phis []PhiParam
 }
 
+// a symbol ref is just a name
+// to a llvm symbol like a globl.
+// Unlike a RefOp it's not an instruction
+// thet references a variable.
+type SymRef struct {
+	Nam string
+	Typ Type
+}
+
+func (s SymRef) Name() string {
+	return s.Nam
+}
+
+func (s SymRef) Type() Type {
+	return s.Typ
+}
+
+func (s SymRef) Emit(*Function) {
+	// no instructions emitted for symrefs
+}
+
+func (s SymRef) Prepare(*Function, *Block) {
+	// no preparation needed for symref
+}
+
 func (b *CallOp) Emit(fun *Function) {
 	args := []string{}
 	for _, a := range b.Args {
@@ -157,6 +183,29 @@ func (b PhiOp) Emit(fun *Function) {
 func ConstInt(typ Type, value int) Const {
 	return Const{typ, fmt.Sprintf("%d", value)}
 }
+
+func (mod *Module) ConstString(value string) Value {
+	name := fmt.Sprintf("@.str%d", mod.Interned.Next())
+	typ := PointerType(IntType(8))
+	init := StringInitializer{value}
+	mod.Globals = append(mod.Globals, Global{Name: name, Type: typ, Init: init})
+	return SymRef{name, typ}
+}
+
+// TODO(mkm): generalize
+type StringInitializer struct {
+	Value string
+}
+
+func Escape(s string) string {
+	return strings.Replace(s, "\n", "\\0A", -1)
+}
+
+func (s StringInitializer) Emit(w io.Writer) {
+	fmt.Fprintf(w, "c\"%s\\00\"", Escape(s.Value))
+}
+
+//
 
 func (b *Binop) Emit(fun *Function) {
 	fun.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name(), b.Op1.Name(), b.Op2.Name())

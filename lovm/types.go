@@ -25,7 +25,7 @@ func (b BasicType) EmitDecl(w io.Writer, name string) {
 }
 
 func (b BasicType) EmitDef(w io.Writer, name string, body func()) {
-	fmt.Fprintf(w, "%s = global %s ")
+	fmt.Fprintf(w, "%s = global %s ", name, b.Name())
 	body()
 	fmt.Fprintf(w, "\n")
 }

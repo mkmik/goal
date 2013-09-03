@@ -43,7 +43,7 @@ func main() {
 	printfType := lovm.FunctionType(lovm.IntType(32), true, lovm.IntType(32))
 	//	printfType := lovm.FunctionType(lovm.IntType(32), true)
 	a := builder.Ref(typ, varA)
-	builder.Call(printfType, "@printf", a)
+	builder.Call(printfType, "@printf", mod.ConstString("hello world\n"), a)
 	builder.Return(typ, a)
 
 	mod.DeclareExternal("@printf", printfType)
