@@ -23,6 +23,7 @@ type Emitter interface {
 type Value interface {
 	Emitter
 	Name() string
+	Type() Type
 }
 
 type Symbol struct {
@@ -35,6 +36,7 @@ type Register interface {
 
 type Valuable struct {
 	Res Sequence
+	Typ Type
 }
 
 type Labelable struct {
@@ -43,6 +45,10 @@ type Labelable struct {
 
 func (b Valuable) Name() string {
 	return fmt.Sprintf("%%%d", b.Res)
+}
+
+func (b Valuable) Type() Type {
+	return b.Typ
 }
 
 func (v *Valuable) Prepare(fun *Function, b *Block) {
@@ -56,7 +62,6 @@ func (v *Labelable) Prepare(fun *Function) {
 type Binop struct {
 	Valuable
 	Instr string
-	Typ   Type
 	Op1   Value
 	Op2   Value
 }
@@ -72,8 +77,13 @@ type BranchIfOp struct {
 
 type ReturnOp struct {
 	Valuable
-	Typ    Type
 	Result Value
+}
+
+type CallOp struct {
+	Valuable
+	Fun  string
+	Args []Value
 }
 
 type Const struct {
@@ -83,7 +93,6 @@ type Const struct {
 
 type RefOp struct {
 	Valuable
-	Typ Type
 	Sym Register
 }
 
@@ -97,8 +106,20 @@ type PhiOp struct {
 	Phis []PhiParam
 }
 
+func (b *CallOp) Emit(fun *Function) {
+	args := []string{}
+	for _, a := range b.Args {
+		args = append(args, fmt.Sprintf("%s %s", a.Type().Name(), a.Name()))
+	}
+	fun.Emitf("%s = call %s %s(%s)", b.Name(), b.Typ.Name(), b.Fun, strings.Join(args, ", "))
+}
+
 func (c Const) Name() string {
 	return c.Val
+}
+
+func (c Const) Type() Type {
+	return c.Typ
 }
 
 func (b Const) Emit(*Function) {
@@ -110,9 +131,7 @@ func (b Const) Prepare(*Function, *Block) {
 }
 
 func (b RefOp) Emit(fun *Function) {
-	if false {
-		log.Fatalf("RefOps have to be replaced during prepare")
-	}
+	// no instructions emitted for refop
 }
 
 func (r *RefOp) Prepare(fun *Function, b *Block) {
@@ -146,6 +165,10 @@ func (b *Binop) Emit(fun *Function) {
 func (b *BranchOp) Name() string {
 	log.Fatalf("Branch ops should never be named")
 	return ""
+}
+
+func (b *BranchOp) Type() Type {
+	return VoidType()
 }
 
 func (b *BranchOp) Prepare(*Function, *Block) {
@@ -212,7 +235,7 @@ func (b *Block) BranchIf(value Value, ifTrue, ifFalse *Block) {
 
 func (b *Block) Return(typ Type, value Value) {
 	b.Add(value)
-	b.Add(&ReturnOp{Valuable{}, typ, value})
+	b.Add(&ReturnOp{Valuable{Typ: typ}, value})
 }
 
 func (b *Block) Name() string {

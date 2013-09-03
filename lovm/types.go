@@ -21,7 +21,7 @@ func (b BasicType) Name() string {
 }
 
 func (b BasicType) EmitDecl(w io.Writer, name string) {
-	fmt.Fprintf(w, "%s = extern global %s\n", name, b.Name())
+	fmt.Fprintf(w, "%s = external global %s\n", name, b.Name())
 }
 
 func (b BasicType) EmitDef(w io.Writer, name string, body func()) {
@@ -41,7 +41,7 @@ type FuncType struct {
 }
 
 func (f FuncType) Name() string {
-	return fmt.Sprintf("%s (%s)", f.ReturnType, strings.Join(f.ParamTypes, ", "))
+	return f.funcDecl("")
 }
 
 func (f FuncType) funcDecl(name string) string {
@@ -78,4 +78,8 @@ func FunctionType(ret Type, variadic bool, params ...Type) FuncType {
 
 func PointerType(typ Type) Type {
 	return BasicType{fmt.Sprintf("%s *", typ.Name())}
+}
+
+func VoidType() Type {
+	return BasicType{"void"}
 }

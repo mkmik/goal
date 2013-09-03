@@ -5,13 +5,17 @@ import (
 )
 
 func (b *Builder) IAdd(typ Type, op1, op2 Value) Value {
-	return b.Add(&Binop{Valuable{}, "add", typ, op1, op2})
+	return b.Add(&Binop{Valuable{Typ: typ}, "add", op1, op2})
 }
 
 func (b *Builder) ICmp(typ Type, op string, op1, op2 Value) Value {
-	return b.Add(&Binop{Valuable{}, fmt.Sprintf("icmp %s", op), typ, op1, op2})
+	return b.Add(&Binop{Valuable{Typ: typ}, fmt.Sprintf("icmp %s", op), op1, op2})
 }
 
 func (b *Builder) Ref(typ Type, sym Symbol) Value {
-	return b.Add(&RefOp{Valuable{}, typ, sym})
+	return b.Add(&RefOp{Valuable{Typ: typ}, sym})
+}
+
+func (b *Builder) Call(typ Type, fun string, args ...Value) Value {
+	return b.Add(&CallOp{Valuable{Typ: PointerType(typ)}, fun, args})
 }

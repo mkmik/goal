@@ -38,8 +38,14 @@ func main() {
 	builder.Branch(endIf)
 
 	builder.SetInsertionPoint(endIf)
-	builder.Return(typ, builder.Ref(typ, varA))
 
-	mod.DeclareExternal("@printf", lovm.FunctionType(lovm.IntType(32), true, lovm.PointerType(lovm.IntType(8))))
+	//	printfType := lovm.FunctionType(lovm.IntType(32), true, lovm.PointerType(lovm.IntType(8)))
+	printfType := lovm.FunctionType(lovm.IntType(32), true, lovm.IntType(32))
+	//	printfType := lovm.FunctionType(lovm.IntType(32), true)
+	a := builder.Ref(typ, varA)
+	builder.Call(printfType, "@printf", a)
+	builder.Return(typ, a)
+
+	mod.DeclareExternal("@printf", printfType)
 	ctx.Emit()
 }
