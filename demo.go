@@ -35,7 +35,7 @@ func main() {
 	ifFalse := fun.NewBlock()
 	endIf := fun.NewBlock()
 
-	cnd := builder.ICmp(lovm.IntSGT, op2, lovm.ConstIntFromString(typ, "B", 16))
+	cnd := builder.IICmp(lovm.IntSGT, op2, lovm.ConstIntFromString(typ, "B", 16))
 	builder.BranchIf(cnd, ifTrue, ifFalse)
 	builder.SetInsertionPoint(ifTrue)
 	builder.Assign(varA, builder.IAdd(op1, lovm.ConstInt(typ, 4)))

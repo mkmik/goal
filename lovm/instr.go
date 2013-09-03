@@ -13,6 +13,10 @@ func (b *Builder) IAdd(op1, op2 Value) Value {
 	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "add", op1, op2})
 }
 
+func (b *Builder) ISub(op1, op2 Value) Value {
+	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "sub", op1, op2})
+}
+
 func (b *Builder) IMul(op1, op2 Value) Value {
 	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "mul", op1, op2})
 }
@@ -25,7 +29,7 @@ func (b *Builder) ISRem(op1, op2 Value) Value {
 	return b.Add(&Binop{Valuable{Typ: op1.Type()}, "srem", op1, op2})
 }
 
-func (b *Builder) ICmp(op string, op1, op2 Value) Value {
+func (b *Builder) IICmp(op string, op1, op2 Value) Value {
 	return b.Add(&Binop{Valuable{Typ: op1.Type()}, fmt.Sprintf("icmp %s", op), op1, op2})
 }
 
