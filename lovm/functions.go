@@ -2,16 +2,15 @@ package lovm
 
 import (
 	"fmt"
+	"goal/common"
 	"io"
 )
-
-type Sequence int
 
 type Function struct {
 	*Module
 	Indent string
-	Tmps   Sequence
-	Labels Sequence
+	Tmps   common.Sequence
+	Labels common.Sequence
 
 	Blocks []*Block
 	Values map[Value]bool
@@ -38,12 +37,6 @@ func (mod *Module) NewFunction(name string, typ Type) *Function {
 	}
 	paramBlock.Prepare(fun)
 	return fun
-}
-
-func (s *Sequence) Next() Sequence {
-	res := *s
-	(*s)++
-	return res
 }
 
 func (fun *Function) NewBlock() *Block {

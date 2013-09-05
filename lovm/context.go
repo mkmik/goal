@@ -1,6 +1,7 @@
 package lovm
 
 import (
+	"goal/common"
 	"io"
 )
 
@@ -37,7 +38,7 @@ type Module struct {
 	Functions []*Function
 	Externals []External
 	Globals   []Global
-	Interned  Sequence
+	Interned  common.Sequence
 }
 
 func (ctx *Context) NewModule(name string) *Module {

@@ -452,6 +452,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				}
 				for i, sym := range symbols {
 					sym.Value = values[i]
+					v.Block.Assign(sym, sym.Value)
 				}
 			}
 		case *ast.IfStmt:
