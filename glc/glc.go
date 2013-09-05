@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	optimize = flag.Bool("optimize", false, "true to enable llvm optimization passes")
-	cfg      = flag.Bool("cfg", false, "view cfg")
+	output = flag.String("o", "-", "output filename")
+	cfg    = flag.Bool("cfg", false, "view cfg")
 )
 
 type Symbol struct {
@@ -553,11 +553,18 @@ func ForUpdatedVars(parent, child Scope, fn func(a, b Symbol)) {
 func CompileFile(fset *token.FileSet, tree *ast.File) error {
 	DumpToFile(tree, "/tmp/ast")
 
-	ctx := lovm.NewContext(os.Stderr)
+	f := os.Stdout
+	if *output != "-" {
+		var err error
+		f, err = os.OpenFile(*output, os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			log.Fatalf("Cannot open output file: %s", *output)
+		}
+	}
+
+	ctx := lovm.NewContext(f)
 	v := &ModuleVisitor{NewFileSetScope(fset, nil), ctx.NewModule(tree.Name.Name), ""}
 	Walk(v, tree)
-
-	fmt.Printf("LLVM: -----------\n")
 
 	ctx.Emit()
 	return nil
