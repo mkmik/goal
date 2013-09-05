@@ -2,15 +2,15 @@ package lovm
 
 import (
 	"fmt"
-	"goal/common"
+	"goal/util"
 	"io"
 )
 
 type Function struct {
 	*Module
 	Indent string
-	Tmps   common.Sequence
-	Labels common.Sequence
+	Tmps   util.Sequence
+	Labels util.Sequence
 
 	Blocks []*Block
 	Values map[Value]bool

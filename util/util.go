@@ -1,4 +1,4 @@
-package common
+package util
 
 type Sequence int
 

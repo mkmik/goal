@@ -2,7 +2,7 @@ package lovm
 
 import (
 	"fmt"
-	"goal/common"
+	"goal/util"
 	"io"
 	"log"
 	"strconv"
@@ -33,12 +33,12 @@ type Register interface {
 }
 
 type Valuable struct {
-	Res common.Sequence
+	Res util.Sequence
 	Typ Type
 }
 
 type Labelable struct {
-	Res common.Sequence
+	Res util.Sequence
 }
 
 func (b Valuable) Name() string {

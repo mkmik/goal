@@ -1,7 +1,7 @@
 package main
 
 import (
-	"goal/common"
+	"goal/util"
 	"goal/lovm"
 	"log"
 	"os"
@@ -9,7 +9,7 @@ import (
 
 type Symbol struct {
 	Name  string
-	Scope common.Sequence
+	Scope util.Sequence
 }
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
 
-	varA := Symbol{"a", common.Sequence(0)}
+	varA := Symbol{"a", util.Sequence(0)}
 	typ := lovm.IntType(32)
 
 	builder.Assign(varA, lovm.Const{typ, "0"})
