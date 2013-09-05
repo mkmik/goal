@@ -36,7 +36,7 @@ func (b *Builder) ISRem(op1, op2 Value) Value {
 
 func (b *Builder) IICmp(op string, op1, op2 Value) Value {
 	assertNotNil(op1, op2, op1.Type(), op2.Type())
-	return b.Add(&Binop{Valuable{Typ: op1.Type()}, fmt.Sprintf("icmp %s", op), op1, op2})
+	return b.Add(&Binop{Valuable{Typ: IntType(1)}, fmt.Sprintf("icmp %s", op), op1, op2})
 }
 
 func (b *Builder) Ref(typ Type, sym Register) Value {

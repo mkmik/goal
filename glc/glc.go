@@ -560,6 +560,7 @@ func CompileFile(fset *token.FileSet, tree *ast.File) error {
 		if err != nil {
 			log.Fatalf("Cannot open output file: %s", *output)
 		}
+		f.Truncate(0)
 	}
 
 	ctx := lovm.NewContext(f)

@@ -16,6 +16,14 @@ func TestCmp(a, b int64) bool {
 	return a > b
 }
 
+func TestBranch(a, b int64) int64 {
+	var x int64 = a
+	if a > b {
+		x = b
+	}
+	return x
+}
+
 /*
 func Test(a, b int64, c int32) int64 {
 	var aa, bc int64 = b * int64(c), a
@@ -32,6 +40,8 @@ func Test(a, b int64, c int32) int64 {
 	return (aa + bc/a) % a
 }
 */
+
+/*
 func TestNested(a int64) int64 {
 	var x int64 = a * a
 	if a > 0 {
@@ -45,6 +55,7 @@ func TestNested(a int64) int64 {
 	}
 	return a + x
 }
+*/
 
 func Printf(a string) int64 {
 	return 0

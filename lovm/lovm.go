@@ -235,7 +235,8 @@ func (s StringInitializer) Emit(w io.Writer) {
 //
 
 func (b *Binop) Emit(fun *Function) {
-	fun.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, b.Typ.Name(), b.Op1.Name(), b.Op2.Name())
+	argType := b.Op1.Type()
+	fun.Emitf("%s = %s %s %s, %s", b.Name(), b.Instr, argType.Name(), b.Op1.Name(), b.Op2.Name())
 }
 
 func (b *BranchOp) Name() string {
@@ -310,6 +311,9 @@ func (b *Block) BranchIf(value Value, ifTrue, ifFalse *Block) {
 }
 
 func (b *Block) Return(value Value) {
+	if b.Function.Type.ReturnType != value.Type() {
+		log.Printf("RETURNING. Should return %#v but it returns %#v", b.Function.Type.ReturnType, value)
+	}
 	b.Add(value)
 	b.Add(&ReturnOp{Valuable{Typ: value.Type()}, value})
 }
