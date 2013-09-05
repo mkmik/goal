@@ -66,7 +66,11 @@ func (f FuncType) funcDecl(name string) string {
 		args = append(args, "...")
 	}
 
-	return fmt.Sprintf("%s %s(%s)", f.ReturnType.Name(), name, strings.Join(args, ", "))
+	sym := ""
+	if name != "" {
+		sym = fmt.Sprintf("@%s", name)
+	}
+	return fmt.Sprintf("%s %s(%s)", f.ReturnType.Name(), sym, strings.Join(args, ", "))
 }
 
 func (f FuncType) EmitDecl(w io.Writer, name string) {

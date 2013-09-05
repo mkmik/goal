@@ -14,7 +14,7 @@ type Symbol struct {
 func main() {
 	ctx := lovm.NewContext(os.Stdout)
 	mod := ctx.NewModule("main")
-	fun := mod.NewFunction("@main", lovm.FunctionType(lovm.IntType(32), false, lovm.IntType(32), lovm.PointerType(lovm.PointerType(lovm.IntType(8)))))
+	fun := mod.NewFunction("main", lovm.FunctionType(lovm.IntType(32), false, lovm.IntType(32), lovm.PointerType(lovm.PointerType(lovm.IntType(8)))))
 	entry := fun.NewBlock()
 	builder := fun.NewBuilder()
 	builder.SetInsertionPoint(entry)
@@ -52,7 +52,7 @@ func main() {
 	builder.SetInsertionPoint(endIf)
 
 	printfType := lovm.FunctionType(lovm.IntType(32), true, lovm.PointerType(lovm.IntType(8)))
-	printfSym := mod.DeclareExternal("@printf", printfType)
+	printfSym := mod.DeclareExternal("printf", printfType)
 	a := builder.Ref(typ, varA)
 	str := mod.ConstString("hello world\n")
 	builder.Call(printfSym.Type(), printfSym.Name(), builder.GEP(str, 0, 0), a)

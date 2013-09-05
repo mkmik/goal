@@ -143,7 +143,7 @@ func (b *CallOp) Emit(fun *Function) {
 	for _, a := range b.Args {
 		args = append(args, fmt.Sprintf("%s %s", a.Type().Name(), a.Name()))
 	}
-	fun.Emitf("%s = call %s %s(%s)", b.Name(), b.Typ.Name(), b.Fun, strings.Join(args, ", "))
+	fun.Emitf("%s = call %s @%s(%s)", b.Name(), b.Typ.Name(), b.Fun, strings.Join(args, ", "))
 }
 
 func (b *GEPOp) Emit(fun *Function) {
