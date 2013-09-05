@@ -91,7 +91,6 @@ type GEPOp struct {
 
 type Param struct {
 	Valuable
-	Typ Type
 }
 
 type Const struct {

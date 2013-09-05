@@ -32,7 +32,7 @@ func (mod *Module) NewFunction(name string, typ Type) *Function {
 	mod.AddFunction(fun)
 	paramBlock := NewBlock(fun)
 	for _, paramType := range signature.ParamTypes {
-		param := &Param{Valuable{}, paramType}
+		param := &Param{Valuable{Typ: paramType}}
 		fun.Params = append(fun.Params, param)
 		paramBlock.Add(param)
 	}
