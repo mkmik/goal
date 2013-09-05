@@ -6,11 +6,12 @@ import (
 )
 
 type Sequence int
+type Sequential int
 
-func (s *Sequence) Next() Sequence {
+func (s *Sequence) Next() Sequential {
 	res := *s
 	(*s)++
-	return res
+	return Sequential(res)
 }
 
 func Perrorf(format string, args ...interface{}) {

@@ -33,12 +33,12 @@ type Register interface {
 }
 
 type Valuable struct {
-	Res util.Sequence
+	Res util.Sequential
 	Typ Type
 }
 
 type Labelable struct {
-	Res util.Sequence
+	Res util.Sequential
 }
 
 func (b Valuable) Name() string {
