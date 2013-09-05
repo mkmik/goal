@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/axw/gollvm/llvm"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"goal/lovm"
 	"log"
 	"os"
 	"runtime/debug"
@@ -21,10 +21,10 @@ var (
 type Symbol struct {
 	Name  string
 	Type  Type
-	Value *llvm.Value
+	Value lovm.Value
 }
 
-func (s Symbol) LlvmType() llvm.Type {
+func (s Symbol) LlvmType() lovm.Type {
 	return s.Type.LlvmType()
 }
 
@@ -58,8 +58,8 @@ func MergeSymbolMaps(maps ...SymbolMap) SymbolMap {
 	res := SymbolMap{}
 	for _, m := range maps {
 		for n, s := range m {
-			v := *s.Value
-			s.Value = &v
+			v := s.Value
+			s.Value = v
 			res[n] = s
 		}
 	}
@@ -104,7 +104,7 @@ func Perrorf(format string, args ...interface{}) {
 
 type ModuleVisitor struct {
 	Scope
-	Module      llvm.Module
+	Module      *lovm.Module
 	PackageName string
 }
 
@@ -113,21 +113,21 @@ type FunctionVisitor struct {
 	*ModuleVisitor
 	*FunctionVisitor
 	FunctionType FunctionType
-	Function     llvm.Value
-	Builder      llvm.Builder
+	Function     *lovm.Function
+	Builder      *lovm.Builder
 }
 
 // contains scope local to a block
 type BlockVisitor struct {
 	Scope
 	*FunctionVisitor
-	Block llvm.BasicBlock
+	Block *lovm.Block
 }
 
 type ExpressionVisitor struct {
 	*BlockVisitor
 	// result of expression
-	Value llvm.Value
+	Value lovm.Value
 	Type  Type
 }
 
@@ -136,16 +136,17 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 		switch n := node.(type) {
 		case *ast.FuncDecl:
 			functionType := v.ParseFuncType(n.Type)
-			llvmFunction := llvm.AddFunction(v.Module, n.Name.Name, functionType.LlvmType())
-			if err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: &llvmFunction}); err != nil {
-				Perrorf("cannot add symbol %#v: %s", n.Name.Name, err)
-			}
+			llvmFunction := v.Module.NewFunction(n.Name.Name, functionType.LlvmType())
+			// TODO(mkm) put it back
+			//if err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: llvmFunction}); err != nil {
+			//	Perrorf("cannot add symbol %#v: %s", n.Name.Name, err)
+			//}
 
 			newScope := NewScope(&v.Scope)
 			for i, p := range functionType.Params {
 				if p.Name != "" {
 					value := llvmFunction.Param(i)
-					p.Value = &value
+					p.Value = value
 					if err := newScope.AddVar(p); err != nil {
 						Perrorf("cannot add symbol %#v: %s", p, err)
 					}
@@ -153,20 +154,20 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 
 			if n.Body != nil {
-				builder := llvm.NewBuilder()
-				defer builder.Dispose()
+				builder := llvmFunction.NewBuilder()
 
-				entry := llvm.AddBasicBlock(llvmFunction, "entry")
-				builder.SetInsertPointAtEnd(entry)
+				entry := llvmFunction.NewBlock()
+				builder.SetInsertionPoint(entry)
 
 				fv := &FunctionVisitor{v, nil, functionType, llvmFunction, builder}
 				bv := &BlockVisitor{newScope, fv, entry}
 				Walk(SkipRoot{bv}, n.Body)
 
 				// debug
-				if *cfg {
-					llvm.ViewFunctionCFG(llvmFunction)
-				}
+				// TODO(mkm): put it back somehow
+				//if *cfg {
+				//lovm.ViewFunctionCFG(llvmFunction)
+				//}
 			}
 			return nil
 		case *ast.DeclStmt:
@@ -207,15 +208,15 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 				Perrorf("cannot declare a var without a type")
 			}
 			typ := s.ParseType(vs.Type)
-			var value llvm.Value
+			var value lovm.Value
 			if vs.Values != nil {
-				ev := &ExpressionVisitor{s, llvm.Value{}, typ}
+				ev := &ExpressionVisitor{s, nil, typ}
 				Walk(ev, vs.Values[idx])
 				value = ev.Value
 			} else {
-				value = llvm.ConstInt(typ.LlvmType(), 0, false)
+				value = lovm.ConstInt(typ.LlvmType(), 0)
 			}
-			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: &value}); err != nil {
+			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: value}); err != nil {
 				Perrorf("cannot add var %s: %s", n.Name, err)
 			}
 		}
@@ -238,7 +239,7 @@ func (s *Scope) AddVar(variable Symbol) error {
 		return fmt.Errorf("Multiple declarations of %s", name)
 	}
 	if variable.Value == nil {
-		value := llvm.ConstInt(variable.Type.LlvmType(), 0, false)
+		value := lovm.ConstInt(variable.Type.LlvmType(), 0)
 		variable.Value = &value
 	}
 	s.Symbols[name] = variable
@@ -291,20 +292,20 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			v.Type = xev.Type
 			switch n.Op {
 			case token.ADD:
-				v.Value = v.Builder.CreateAdd(xev.Value, yev.Value, "")
+				v.Value = v.Builder.IAdd(xev.Value, yev.Value)
 			case token.SUB:
-				v.Value = v.Builder.CreateSub(xev.Value, yev.Value, "")
+				v.Value = v.Builder.ISub(xev.Value, yev.Value)
 			case token.MUL:
-				v.Value = v.Builder.CreateMul(xev.Value, yev.Value, "")
+				v.Value = v.Builder.IMul(xev.Value, yev.Value)
 			case token.QUO:
-				v.Value = v.Builder.CreateSDiv(xev.Value, yev.Value, "")
+				v.Value = v.Builder.ISDiv(xev.Value, yev.Value)
 			case token.REM:
-				v.Value = v.Builder.CreateSRem(xev.Value, yev.Value, "")
+				v.Value = v.Builder.ISRem(xev.Value, yev.Value)
 			case token.LSS:
-				v.Value = v.Builder.CreateICmp(llvm.IntSLT, xev.Value, yev.Value, "")
+				v.Value = v.Builder.IICmp(lovm.IntSLT, xev.Value, yev.Value)
 				v.Type = Bool
 			case token.GTR:
-				v.Value = v.Builder.CreateICmp(llvm.IntSGT, xev.Value, yev.Value, "")
+				v.Value = v.Builder.IICmp(lovm.IntSGT, xev.Value, yev.Value)
 				v.Type = Bool
 			default:
 				Perrorf("inimplemented binary operator %v", n.Op)
@@ -323,23 +324,23 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 			switch n.Kind {
 			case token.INT:
-				v.Value = llvm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
+				v.Value = lovm.ConstIntFromString(v.Type.LlvmType(), n.Value, 10)
 			case token.STRING:
-				v.Value = v.Builder.CreateGlobalStringPtr(n.Value, "")
+				v.Value = v.Module.ConstString(n.Value)
 			default:
 				Perrorf("Unimplemented literal: %#v", n)
 			}
 		case *ast.Ident:
 			if n.Name == "true" {
 				v.Type = Bool
-				v.Value = llvm.ConstInt(v.Type.LlvmType(), 1, false)
+				v.Value = lovm.ConstInt(v.Type.LlvmType(), 1)
 			} else if n.Name == "false" {
 				v.Type = Bool
-				v.Value = llvm.ConstInt(v.Type.LlvmType(), 0, false)
+				v.Value = lovm.ConstInt(v.Type.LlvmType(), 0)
 			} else {
 				symbol := v.ResolveSymbol(n.Name)
 				v.Type = symbol.Type
-				v.Value = *symbol.Value
+				v.Value = symbol.Value
 			}
 			return nil
 		case *ast.CallExpr:
@@ -349,19 +350,21 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 						Perrorf("type conversion can have only one argument")
 					}
 					ev := v.Evaluate(n.Args[0])
-					v.Value = v.Builder.CreateIntCast(ev.Value, typ.LlvmType(), "")
+					Perrorf("not migrated to new api: %v, %v", typ, ev)
+					//v.Value = v.Builder.CreateIntCast(ev.Value, typ.LlvmType(), "")
 				} else {
 					fs := v.ResolveSymbol(id.Name)
 					if _, ok := fs.Type.(FunctionType); !ok {
 						Perrorf("Calling a non function")
 					}
-					args := []llvm.Value{}
+					args := []lovm.Value{}
 					for _, a := range n.Args {
 						ex := v.Evaluate(a)
 						// TODO(mkm) check types
 						args = append(args, ex.Value)
 					}
-					v.Value = v.Builder.CreateCall(*fs.Value, args, "")
+					Perrorf("not migrated to new api")
+					//v.Value = v.Builder.Call(*fs.Value, args)
 				}
 				return nil
 			}
@@ -381,14 +384,14 @@ func (v *ExpressionVisitor) Evaluate(exp ast.Expr) *ExpressionVisitor {
 }
 
 func (v *BlockVisitor) Evaluate(typ Type, exp ast.Expr) *ExpressionVisitor {
-	ev := &ExpressionVisitor{v, llvm.Value{}, typ}
+	ev := &ExpressionVisitor{v, nil, typ}
 	Walk(ev, exp)
 	return ev
 }
 
 func (v *BlockVisitor) EvaluateBlock(exp ast.Stmt) *BlockVisitor {
 	newScope := NewScope(&v.Scope)
-	bv := &BlockVisitor{newScope, v.FunctionVisitor, llvm.BasicBlock{}}
+	bv := &BlockVisitor{newScope, v.FunctionVisitor, &lovm.Block{}}
 	Walk(SkipRoot{bv}, exp)
 	return bv
 }
@@ -402,26 +405,26 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				Perrorf("too many/too few arguments to return")
 			}
 
-			values := make([]llvm.Value, len(n.Results))
-			types := make([]llvm.Type, len(n.Results))
+			values := make([]lovm.Value, len(n.Results))
+			types := make([]lovm.Type, len(n.Results))
 
 			for i, e := range n.Results {
-				ev := &ExpressionVisitor{v, llvm.Value{}, functionReturnSymbols[i].Type}
+				ev := &ExpressionVisitor{v, nil, functionReturnSymbols[i].Type}
 				Walk(ev, e)
 				values[i] = ev.Value
 				types[i] = ev.Type.LlvmType()
 			}
 
-			var res llvm.Value
+			var res lovm.Value
 			switch len(values) {
 			case 1:
 				res = values[0]
 			default:
 				Perrorf("unimplemented multiple return values")
 			}
-			v.Builder.CreateRet(res)
+			v.Builder.Return(res)
 		case *ast.ExprStmt:
-			ev := &ExpressionVisitor{v, llvm.Value{}, Any}
+			ev := &ExpressionVisitor{v, nil, Any}
 			Walk(ev, n.X)
 
 			//Perrorf("NOT IMPLEMENTED YET: expression statements")
@@ -443,82 +446,87 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 					symbols[i] = v.ResolveSymbol(e.(*ast.Ident).Name)
 				}
 
-				values := make([]llvm.Value, len(n.Lhs))
+				values := make([]lovm.Value, len(n.Lhs))
 				for i, e := range n.Rhs {
-					ev := &ExpressionVisitor{v, llvm.Value{}, symbols[i].Type}
+					ev := &ExpressionVisitor{v, nil, symbols[i].Type}
 					Walk(ev, e)
 					values[i] = ev.Value
 				}
 				for i, sym := range symbols {
-					*sym.Value = values[i]
+					sym.Value = values[i]
 				}
 			}
 		case *ast.IfStmt:
-			var scope Scope = v.Scope
+			//var scope Scope = v.Scope
 			if n.Init != nil {
 				// TODO(mkm) fix scoping issues when detecting changed values
 				//scope = NewScope(&v.Scope)
 				Walk(v, n.Init)
 			}
 			cond := v.Evaluate(Bool, n.Cond)
-			iftrue := llvm.AddBasicBlock(v.Function, "iftrue")
-			iffalse := llvm.AddBasicBlock(v.Function, "iffalse")
-			endif := llvm.AddBasicBlock(v.Function, "endif")
+			iftrue := v.Function.NewBlock()
+			iffalse := v.Function.NewBlock()
+			endif := v.Function.NewBlock()
 
-			v.Builder.CreateCondBr(cond.Value, iftrue, iffalse)
+			v.Builder.BranchIf(cond.Value, iftrue, iffalse)
 
-			v.Builder.SetInsertPointAtEnd(iftrue)
-			ifTrueVisitor := v.EvaluateBlock(n.Body)
-			ifTrueSource := v.Builder.GetInsertBlock()
-			v.Builder.CreateBr(endif)
+			v.Builder.SetInsertionPoint(iftrue)
+			//ifTrueVisitor := v.EvaluateBlock(n.Body)
+			v.EvaluateBlock(n.Body)
+			//ifTrueSource := v.Builder.GetInsertBlock()
+			v.Builder.Branch(endif)
 
-			v.Builder.SetInsertPointAtEnd(iffalse)
-			ifFalseSource := iffalse
-			var ifFalseVisitor *BlockVisitor
+			v.Builder.SetInsertionPoint(iffalse)
+			//ifFalseSource := iffalse
+			//var ifFalseVisitor *BlockVisitor
 			if n.Else != nil {
-				ifFalseVisitor = v.EvaluateBlock(n.Else)
-				ifFalseSource = v.Builder.GetInsertBlock()
+				//ifFalseVisitor = v.EvaluateBlock(n.Else)
+				v.EvaluateBlock(n.Else)
+				//ifFalseSource = v.Builder.GetInsertBlock()
 			}
-			v.Builder.CreateBr(endif)
-			v.Builder.SetInsertPointAtEnd(endif)
+			v.Builder.Branch(endif)
+			v.Builder.SetInsertionPoint(endif)
 
-			type Phi struct {
-				Parent Symbol
-				Left   Symbol
-				Right  Symbol
-			}
-			phis := map[string]Phi{}
+			// TODO(mkm) use phis created by lovm
+			/*
+				type Phi struct {
+					Parent Symbol
+					Left   Symbol
+					Right  Symbol
+				}
+				phis := map[string]Phi{}
 
-			ForUpdatedVars(scope, ifTrueVisitor.Scope, func(a, b Symbol) {
-				phi := phis[a.Name]
-				phi.Parent = a
-				phi.Left = b
-				phis[a.Name] = phi
-			})
-			if ifFalseVisitor != nil {
-				ForUpdatedVars(scope, ifFalseVisitor.Scope, func(a, b Symbol) {
+				ForUpdatedVars(scope, ifTrueVisitor.Scope, func(a, b Symbol) {
 					phi := phis[a.Name]
 					phi.Parent = a
-					phi.Right = b
+					phi.Left = b
 					phis[a.Name] = phi
 				})
-			}
-
-			for _, p := range phis {
-				if p.Left.Value == nil {
-					p.Left = p.Parent
+				if ifFalseVisitor != nil {
+					ForUpdatedVars(scope, ifFalseVisitor.Scope, func(a, b Symbol) {
+						phi := phis[a.Name]
+						phi.Parent = a
+						phi.Right = b
+						phis[a.Name] = phi
+					})
 				}
-				if p.Right.Value == nil {
-					p.Right = p.Parent
+
+				for _, p := range phis {
+					if p.Left.Value == nil {
+						p.Left = p.Parent
+					}
+					if p.Right.Value == nil {
+						p.Right = p.Parent
+					}
+
+					phi := v.Builder.CreatePHI(p.Parent.Type.LlvmType(), "")
+					phiVals := []lovm.Value{*p.Left.Value, *p.Right.Value}
+					phiBlocks := []*lovm.Block{ifTrueSource, ifFalseSource}
+					phi.AddIncoming(phiVals, phiBlocks)
+
+					*p.Parent.Value = phi
 				}
-
-				phi := v.Builder.CreatePHI(p.Parent.Type.LlvmType(), "")
-				phiVals := []llvm.Value{*p.Left.Value, *p.Right.Value}
-				phiBlocks := []llvm.BasicBlock{ifTrueSource, ifFalseSource}
-				phi.AddIncoming(phiVals, phiBlocks)
-
-				*p.Parent.Value = phi
-			}
+			*/
 		default:
 			Perrorf("----- Block visitor: UNKNOWN %#v\n", node)
 			return v
@@ -530,6 +538,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 	return nil
 }
 
+/*
 func ForUpdatedVars(parent, child Scope, fn func(a, b Symbol)) {
 	for n, s := range parent.Symbols {
 		if cs, ok := child.Symbols[n]; ok {
@@ -539,31 +548,19 @@ func ForUpdatedVars(parent, child Scope, fn func(a, b Symbol)) {
 		}
 	}
 }
+*/
 
 func CompileFile(fset *token.FileSet, tree *ast.File) error {
 	DumpToFile(tree, "/tmp/ast")
 
-	v := &ModuleVisitor{NewFileSetScope(fset, nil), llvm.NewModule(tree.Name.Name), ""}
+	ctx := lovm.NewContext(os.Stderr)
+	v := &ModuleVisitor{NewFileSetScope(fset, nil), ctx.NewModule(tree.Name.Name), ""}
 	Walk(v, tree)
 
 	fmt.Printf("LLVM: -----------\n")
 
-	if *optimize {
-		Optimize(v.Module)
-	}
-	v.Module.Dump()
+	ctx.Emit()
 	return nil
-}
-
-func Optimize(mod llvm.Module) {
-	pass := llvm.NewPassManager()
-	defer pass.Dispose()
-	pass.AddConstantPropagationPass()
-	pass.AddInstructionCombiningPass()
-	pass.AddPromoteMemoryToRegisterPass()
-	pass.AddGVNPass()
-	pass.AddCFGSimplificationPass()
-	pass.Run(mod)
 }
 
 func OpenAndCompileFile(name string) error {

@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/axw/gollvm/llvm"
 	"go/ast"
+	"goal/lovm"
 )
 
 var (
@@ -12,20 +12,20 @@ var (
 
 var (
 	Any    = AnyType{}
-	Int    = PrimitiveType{"int", true, llvm.Int32Type()}
-	Int8   = PrimitiveType{"int8", true, llvm.Int8Type()}
-	Int16  = PrimitiveType{"int16", true, llvm.Int16Type()}
-	Int32  = PrimitiveType{"int32", true, llvm.Int32Type()}
-	Int64  = PrimitiveType{"int64", true, llvm.Int64Type()}
-	Uint   = PrimitiveType{"int", false, llvm.Int32Type()}
-	Uint8  = PrimitiveType{"int8", false, llvm.Int8Type()}
-	Uint16 = PrimitiveType{"int16", false, llvm.Int16Type()}
-	Uint32 = PrimitiveType{"int32", false, llvm.Int32Type()}
-	Uint64 = PrimitiveType{"int64", false, llvm.Int64Type()}
-	Bool   = PrimitiveType{"bool", false, llvm.Int1Type()}
-	String = PrimitiveType{"string", false, llvm.PointerType(llvm.Int8Type(), 0)}
+	Int    = PrimitiveType{"int", true, lovm.IntType(32)}
+	Int8   = PrimitiveType{"int8", true, lovm.IntType(8)}
+	Int16  = PrimitiveType{"int16", true, lovm.IntType(16)}
+	Int32  = PrimitiveType{"int32", true, lovm.IntType(32)}
+	Int64  = PrimitiveType{"int64", true, lovm.IntType(64)}
+	Uint   = PrimitiveType{"int", false, lovm.IntType(32)}
+	Uint8  = PrimitiveType{"int8", false, lovm.IntType(8)}
+	Uint16 = PrimitiveType{"int16", false, lovm.IntType(16)}
+	Uint32 = PrimitiveType{"int32", false, lovm.IntType(32)}
+	Uint64 = PrimitiveType{"int64", false, lovm.IntType(64)}
+	Bool   = PrimitiveType{"bool", false, lovm.IntType(1)}
+	String = PrimitiveType{"string", false, lovm.PointerType(lovm.IntType(8))}
 	// TODO(mkm): should be an interface type
-	Error = PrimitiveType{"error", false, llvm.PointerType(llvm.Int8Type(), 0)}
+	Error = PrimitiveType{"error", false, lovm.PointerType(lovm.IntType(8))}
 )
 
 var (
@@ -54,7 +54,7 @@ func init() {
 }
 
 type Type interface {
-	LlvmType() llvm.Type
+	LlvmType() lovm.Type
 	//	String() string
 }
 
@@ -65,20 +65,20 @@ type IntegerType interface {
 type PrimitiveType struct {
 	Name     string
 	Signed   bool
-	llvmType llvm.Type
+	llvmType lovm.Type
 }
 
 type AnyType struct{}
 
-func (b AnyType) LlvmType() llvm.Type {
-	return llvm.VoidType()
+func (b AnyType) LlvmType() lovm.Type {
+	return lovm.VoidType()
 }
 
 func (b AnyType) String() string {
 	return "Type(Any)"
 }
 
-func (b PrimitiveType) LlvmType() llvm.Type {
+func (b PrimitiveType) LlvmType() lovm.Type {
 	return b.llvmType
 }
 
@@ -91,17 +91,17 @@ type MapType struct {
 	Value Type
 }
 
-func (b MapType) LlvmType() llvm.Type {
-	return llvm.PointerType(llvm.Int8Type(), 0)
+func (b MapType) LlvmType() lovm.Type {
+	return lovm.PointerType(lovm.IntType(8))
 }
 
 type SliceType struct {
 	Value Type
 }
 
-func (b SliceType) LlvmType() llvm.Type {
+func (b SliceType) LlvmType() lovm.Type {
 	// TODO(mkm) use struct type
-	return llvm.PointerType(llvm.Int8Type(), 0)
+	return lovm.PointerType(lovm.IntType(8))
 }
 
 type FunctionType struct {
@@ -174,18 +174,19 @@ func (s *Scope) ParseFuncType(ft *ast.FuncType) FunctionType {
 	}
 }
 
-func (t FunctionType) LlvmType() llvm.Type {
+func (t FunctionType) LlvmType() lovm.Type {
 	func_arg_types := SymbolsToLlvmTypes(t.Params)
 	func_ret_types := SymbolsToLlvmTypes(t.Results)
 
-	var func_ret_type llvm.Type
+	var func_ret_type lovm.Type
 	switch len(func_ret_types) {
 	case 0:
-		func_ret_type = llvm.VoidType()
+		func_ret_type = lovm.VoidType()
 	case 1:
 		func_ret_type = func_ret_types[0]
 	default:
-		func_ret_type = llvm.StructType(func_ret_types, false)
+		Perrorf("not migrated yet to lovm")
+		//func_ret_type = lovm.StructType(func_ret_types, false)
 	}
-	return llvm.FunctionType(func_ret_type, func_arg_types, false)
+	return lovm.FunctionType(func_ret_type, false, func_arg_types...)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"goal/lovm"
+	"log"
 	"os"
 )
 
@@ -42,6 +43,10 @@ func main() {
 	builder.Branch(endIf)
 
 	builder.SetInsertionPoint(ifFalse)
+	dummy := builder.GetInsertBlock()
+	if ifFalse != dummy {
+		log.Fatalf("assertion error, %v != %v", dummy, ifFalse)
+	}
 	builder.Branch(endIf)
 
 	builder.SetInsertionPoint(endIf)

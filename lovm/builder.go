@@ -19,3 +19,7 @@ func (ctx *Context) NewBuilder() *Builder {
 func (b *Builder) SetInsertionPoint(block *Block) {
 	b.Adder = block
 }
+
+func (b *Builder) GetInsertBlock() *Block {
+	return b.Adder.(*Block)
+}

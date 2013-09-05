@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"go/ast"
-	"os"
 	"io"
 	"log"
+	"os"
 )
 
 type dumper struct {
@@ -29,7 +29,7 @@ func (v *dumper) Visit(node ast.Node) ast.Visitor {
 }
 
 func DumpToFile(tree ast.Node, fileName string) {
-	f, err := os.OpenFile(fileName, os.O_CREATE | os.O_WRONLY, 0666)
+	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal("cannot open debug file", err)
 	}

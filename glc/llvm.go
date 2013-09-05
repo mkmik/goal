@@ -1,23 +1,22 @@
 package main
 
 import (
-	"github.com/axw/gollvm/llvm"
 	"go/ast"
+	"goal/lovm"
 )
 
-func (s *Scope) ParseLlvmType(typeName ast.Expr) llvm.Type {
+func (s *Scope) ParseLlvmType(typeName ast.Expr) lovm.Type {
 	return s.ParseType(typeName).LlvmType()
 }
 
-func SymbolsToLlvmTypes(ss []Symbol) (res []llvm.Type) {
+func SymbolsToLlvmTypes(ss []Symbol) (res []lovm.Type) {
 	for _, s := range ss {
 		res = append(res, s.LlvmType())
 	}
 	return
 }
 
-
-func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type) {
+func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []lovm.Type) {
 	if fl == nil {
 		return nil
 	}
@@ -26,7 +25,7 @@ func (s *Scope) ParseLlvmTypes(fl *ast.FieldList) (res []llvm.Type) {
 		if f.Names == nil {
 			res = append(res, t)
 		} else {
-			args := make([]llvm.Type, len(f.Names))
+			args := make([]lovm.Type, len(f.Names))
 			for i := range f.Names {
 				args[i] = t
 			}
