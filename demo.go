@@ -1,8 +1,8 @@
 package main
 
 import (
-	"goal/util"
 	"goal/lovm"
+	"goal/util"
 	"log"
 	"os"
 )

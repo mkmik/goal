@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"goal/lovm"
+	"goal/util"
 )
 
 var (
@@ -113,7 +114,7 @@ type FunctionType struct {
 func (s *Scope) ParseType(typeName ast.Expr) Type {
 	res, err := s.ResolveType(typeName)
 	if err != nil {
-		Perrorf("%s", err)
+		util.Perrorf("%s", err)
 	}
 	return res
 }
@@ -185,7 +186,7 @@ func (t FunctionType) LlvmType() lovm.Type {
 	case 1:
 		func_ret_type = func_ret_types[0]
 	default:
-		Perrorf("not migrated yet to lovm")
+		util.Perrorf("not migrated yet to lovm")
 		//func_ret_type = lovm.StructType(func_ret_types, false)
 	}
 	return lovm.FunctionType(func_ret_type, false, func_arg_types...)

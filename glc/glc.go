@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"goal/lovm"
+	"goal/util"
 	"log"
 	"os"
 	"runtime/debug"
@@ -98,10 +99,6 @@ func Walk(visitor Visitor, node ast.Node) {
 	ast.Walk(visitor, node)
 }
 
-func Perrorf(format string, args ...interface{}) {
-	panic(fmt.Errorf(format, args...))
-}
-
 type ModuleVisitor struct {
 	Scope
 	Module      *lovm.Module
@@ -139,7 +136,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			llvmFunction := v.Module.NewFunction(n.Name.Name, functionType.LlvmType())
 			// TODO(mkm) put it back
 			//if err := v.AddVar(Symbol{Name: n.Name.Name, Type: functionType, Value: llvmFunction}); err != nil {
-			//	Perrorf("cannot add symbol %#v: %s", n.Name.Name, err)
+			//	util.Perrorf("cannot add symbol %#v: %s", n.Name.Name, err)
 			//}
 
 			newScope := NewScope(&v.Scope)
@@ -148,7 +145,7 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 					value := llvmFunction.Param(i)
 					p.Value = value
 					if err := newScope.AddVar(p); err != nil {
-						Perrorf("cannot add symbol %#v: %s", p, err)
+						util.Perrorf("cannot add symbol %#v: %s", p, err)
 					}
 				}
 			}
@@ -171,13 +168,13 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 			return nil
 		case *ast.DeclStmt:
-			Perrorf("Unimplemented decl stmt")
+			util.Perrorf("Unimplemented decl stmt")
 		case *ast.File:
 			// root element, nothing to do
 			return v
 		case *ast.Ident:
 			if v.PackageName != "" {
-				Perrorf("Cannot have more than one top level ast.Ident")
+				util.Perrorf("Cannot have more than one top level ast.Ident")
 			}
 			v.PackageName = n.Name
 			return nil
@@ -186,10 +183,10 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			case token.IMPORT:
 				// ignore imports for now
 			default:
-				Perrorf("UNIMPLEMENTED UNKNOWN GENDECL: %#v", node)
+				util.Perrorf("UNIMPLEMENTED UNKNOWN GENDECL: %#v", node)
 			}
 		default:
-			Perrorf("-----: Module visitor: UNKNOWN %#v\n", node)
+			util.Perrorf("-----: Module visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	} else {
@@ -205,7 +202,7 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 		vs := sp.(*ast.ValueSpec)
 		for idx, n := range vs.Names {
 			if vs.Type == nil {
-				Perrorf("cannot declare a var without a type")
+				util.Perrorf("cannot declare a var without a type")
 			}
 			typ := s.ParseType(vs.Type)
 			var value lovm.Value
@@ -217,7 +214,7 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 				value = lovm.ConstInt(typ.LlvmType(), 0)
 			}
 			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: value}); err != nil {
-				Perrorf("cannot add var %s: %s", n.Name, err)
+				util.Perrorf("cannot add var %s: %s", n.Name, err)
 			}
 		}
 	}
@@ -229,7 +226,7 @@ func (s *Scope) ResolveSymbol(name string) Symbol {
 		return res
 	}
 
-	Perrorf("cannot resolve symbol: %s", name)
+	util.Perrorf("cannot resolve symbol: %s", name)
 	return Symbol{}
 }
 
@@ -264,7 +261,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			return v
 		case *ast.BinaryExpr:
 			if v.IsConst(n.X) && v.IsConst(n.Y) {
-				Perrorf("expression with only constants not implemented yet...")
+				util.Perrorf("expression with only constants not implemented yet...")
 			}
 
 			var xev, yev *ExpressionVisitor
@@ -286,7 +283,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 
 			if xev.Type != yev.Type {
-				Perrorf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
+				util.Perrorf("Types %#v and %#v are not compatible (A)", xev.Type, yev.Type)
 			}
 			// types must match, thus take either one
 			v.Type = xev.Type
@@ -308,7 +305,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 				v.Value = v.Builder.IICmp(lovm.IntSGT, xev.Value, yev.Value)
 				v.Type = Bool
 			default:
-				Perrorf("inimplemented binary operator %v", n.Op)
+				util.Perrorf("inimplemented binary operator %v", n.Op)
 			}
 
 			return nil
@@ -320,7 +317,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 
 			if v.Type == Bool {
-				Perrorf("Boolean arithmetic is not allowed: %#v", n)
+				util.Perrorf("Boolean arithmetic is not allowed: %#v", n)
 			}
 			switch n.Kind {
 			case token.INT:
@@ -328,7 +325,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			case token.STRING:
 				v.Value = v.Module.ConstString(n.Value)
 			default:
-				Perrorf("Unimplemented literal: %#v", n)
+				util.Perrorf("Unimplemented literal: %#v", n)
 			}
 		case *ast.Ident:
 			if n.Name == "true" {
@@ -347,15 +344,15 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			if id, ok := n.Fun.(*ast.Ident); ok {
 				if typ, err := v.ResolveType(id); err == nil {
 					if len(n.Args) != 1 {
-						Perrorf("type conversion can have only one argument")
+						util.Perrorf("type conversion can have only one argument")
 					}
 					ev := v.Evaluate(n.Args[0])
-					Perrorf("not migrated to new api: %v, %v", typ, ev)
+					util.Perrorf("not migrated to new api: %v, %v", typ, ev)
 					//v.Value = v.Builder.CreateIntCast(ev.Value, typ.LlvmType(), "")
 				} else {
 					fs := v.ResolveSymbol(id.Name)
 					if _, ok := fs.Type.(FunctionType); !ok {
-						Perrorf("Calling a non function")
+						util.Perrorf("Calling a non function")
 					}
 					args := []lovm.Value{}
 					for _, a := range n.Args {
@@ -363,14 +360,14 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 						// TODO(mkm) check types
 						args = append(args, ex.Value)
 					}
-					Perrorf("not migrated to new api")
+					util.Perrorf("not migrated to new api")
 					//v.Value = v.Builder.Call(*fs.Value, args)
 				}
 				return nil
 			}
-			Perrorf("Unimplemented call %#v", node)
+			util.Perrorf("Unimplemented call %#v", node)
 		default:
-			Perrorf("----- Expression visitor: UNKNOWN %#v\n", node)
+			util.Perrorf("----- Expression visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	}
@@ -402,7 +399,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		case *ast.ReturnStmt:
 			functionReturnSymbols := v.FunctionType.Results
 			if len(functionReturnSymbols) != len(n.Results) {
-				Perrorf("too many/too few arguments to return")
+				util.Perrorf("too many/too few arguments to return")
 			}
 
 			values := make([]lovm.Value, len(n.Results))
@@ -420,7 +417,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			case 1:
 				res = values[0]
 			default:
-				Perrorf("unimplemented multiple return values")
+				util.Perrorf("unimplemented multiple return values")
 			}
 			v.Builder.Return(res)
 		case *ast.ExprStmt:
@@ -433,10 +430,10 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		case *ast.AssignStmt:
 			if n.Tok == token.DEFINE {
-				Perrorf("NOT IMPLEMENTED YET: type inference in var decl")
+				util.Perrorf("NOT IMPLEMENTED YET: type inference in var decl")
 			} else {
 				if len(n.Lhs) != len(n.Rhs) {
-					Perrorf("too many/too few expressions in assignment")
+					util.Perrorf("too many/too few expressions in assignment")
 				}
 
 				symbols := make([]Symbol, len(n.Lhs))
@@ -478,7 +475,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			v.Builder.Branch(endif)
 			v.Builder.SetInsertionPoint(endif)
 		default:
-			Perrorf("----- Block visitor: UNKNOWN %#v\n", node)
+			util.Perrorf("----- Block visitor: UNKNOWN %#v\n", node)
 			return v
 		}
 	} else {
