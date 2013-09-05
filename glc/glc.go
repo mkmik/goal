@@ -426,8 +426,6 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 		case *ast.ExprStmt:
 			ev := &ExpressionVisitor{v, nil, Any}
 			Walk(ev, n.X)
-
-			//Perrorf("NOT IMPLEMENTED YET: expression statements")
 		case *ast.DeclStmt:
 			err := v.AddDecl(n.Decl)
 			if err != nil {
@@ -457,10 +455,8 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 				}
 			}
 		case *ast.IfStmt:
-			//var scope Scope = v.Scope
 			if n.Init != nil {
-				// TODO(mkm) fix scoping issues when detecting changed values
-				//scope = NewScope(&v.Scope)
+				// TODO(mkm) fix scoping issue
 				Walk(v, n.Init)
 			}
 			cond := v.Evaluate(Bool, n.Cond)
@@ -471,62 +467,15 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 			v.Builder.BranchIf(cond.Value, iftrue, iffalse)
 
 			v.Builder.SetInsertionPoint(iftrue)
-			//ifTrueVisitor := v.EvaluateBlock(n.Body)
 			v.EvaluateBlock(n.Body)
-			//ifTrueSource := v.Builder.GetInsertBlock()
 			v.Builder.Branch(endif)
 
 			v.Builder.SetInsertionPoint(iffalse)
-			//ifFalseSource := iffalse
-			//var ifFalseVisitor *BlockVisitor
 			if n.Else != nil {
-				//ifFalseVisitor = v.EvaluateBlock(n.Else)
 				v.EvaluateBlock(n.Else)
-				//ifFalseSource = v.Builder.GetInsertBlock()
 			}
 			v.Builder.Branch(endif)
 			v.Builder.SetInsertionPoint(endif)
-
-			// TODO(mkm) use phis created by lovm
-			/*
-				type Phi struct {
-					Parent Symbol
-					Left   Symbol
-					Right  Symbol
-				}
-				phis := map[string]Phi{}
-
-				ForUpdatedVars(scope, ifTrueVisitor.Scope, func(a, b Symbol) {
-					phi := phis[a.Name]
-					phi.Parent = a
-					phi.Left = b
-					phis[a.Name] = phi
-				})
-				if ifFalseVisitor != nil {
-					ForUpdatedVars(scope, ifFalseVisitor.Scope, func(a, b Symbol) {
-						phi := phis[a.Name]
-						phi.Parent = a
-						phi.Right = b
-						phis[a.Name] = phi
-					})
-				}
-
-				for _, p := range phis {
-					if p.Left.Value == nil {
-						p.Left = p.Parent
-					}
-					if p.Right.Value == nil {
-						p.Right = p.Parent
-					}
-
-					phi := v.Builder.CreatePHI(p.Parent.Type.LlvmType(), "")
-					phiVals := []lovm.Value{*p.Left.Value, *p.Right.Value}
-					phiBlocks := []*lovm.Block{ifTrueSource, ifFalseSource}
-					phi.AddIncoming(phiVals, phiBlocks)
-
-					*p.Parent.Value = phi
-				}
-			*/
 		default:
 			Perrorf("----- Block visitor: UNKNOWN %#v\n", node)
 			return v
