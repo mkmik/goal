@@ -149,11 +149,11 @@ func (s *Scope) ParseSymbols(fl *ast.FieldList) (res []Symbol) {
 	for _, f := range fl.List {
 		t := s.ParseType(f.Type)
 		if f.Names == nil {
-			res = append(res, Symbol{Name: "", Type: t})
+			res = append(res, Symbol{Name: "", Type: t, Id: s.VarSequence.Next()})
 		} else {
 			args := make([]Symbol, len(f.Names))
 			for i, n := range f.Names {
-				args[i] = Symbol{Name: n.Name, Type: t}
+				args[i] = Symbol{Name: n.Name, Type: t, Id: s.VarSequence.Next()}
 			}
 			res = append(res, args...)
 		}

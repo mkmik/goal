@@ -20,9 +20,9 @@ var (
 )
 
 type Symbol struct {
-	Name  string
-	Type  Type
-	Value lovm.Value
+	Name string
+	Type Type
+	Id   util.Sequential
 }
 
 func (s Symbol) LlvmType() lovm.Type {
@@ -35,7 +35,8 @@ type SymbolMap map[string]Symbol
 // visitors
 type Scope struct {
 	*token.FileSet
-	Symbols SymbolMap
+	Symbols     SymbolMap
+	VarSequence *util.Sequence
 }
 
 func (s Scope) GetScope() Scope {
@@ -47,24 +48,7 @@ func NewScope(parent *Scope) Scope {
 }
 
 func NewFileSetScope(fset *token.FileSet, parent *Scope) Scope {
-	mergedSymbols := SymbolMap{}
-	if parent != nil {
-		mergedSymbols = MergeSymbolMaps(parent.Symbols)
-	}
-	return Scope{fset, mergedSymbols}
-}
-
-func MergeSymbolMaps(maps ...SymbolMap) SymbolMap {
-	//fmt.Printf("MERGING SYMBOL MAPS %#v\n", maps)
-	res := SymbolMap{}
-	for _, m := range maps {
-		for n, s := range m {
-			v := s.Value
-			s.Value = v
-			res[n] = s
-		}
-	}
-	return res
+	return Scope{fset, parent.Symbols, parent.VarSequence}
 }
 
 type Visitor interface {
@@ -103,6 +87,7 @@ type ModuleVisitor struct {
 	Scope
 	Module      *lovm.Module
 	PackageName string
+	VarSequence util.Sequence
 }
 
 // contains common state shared accross the function
@@ -139,22 +124,22 @@ func (v *ModuleVisitor) Visit(node ast.Node) ast.Visitor {
 			//	util.Perrorf("cannot add symbol %#v: %s", n.Name.Name, err)
 			//}
 
-			newScope := NewScope(&v.Scope)
-			for i, p := range functionType.Params {
-				if p.Name != "" {
-					value := llvmFunction.Param(i)
-					p.Value = value
-					if err := newScope.AddVar(p); err != nil {
-						util.Perrorf("cannot add symbol %#v: %s", p, err)
-					}
-				}
-			}
-
 			if n.Body != nil {
 				builder := llvmFunction.NewBuilder()
 
 				entry := llvmFunction.NewBlock()
 				builder.SetInsertionPoint(entry)
+
+				newScope := NewScope(&v.Scope)
+				for i, p := range functionType.Params {
+					if p.Name != "" {
+						if err := newScope.AddVar(p); err != nil {
+							util.Perrorf("cannot add symbol %#v: %s", p, err)
+						}
+						value := llvmFunction.Param(i)
+						entry.Assign(p, value)
+					}
+				}
 
 				fv := &FunctionVisitor{v, nil, functionType, llvmFunction, builder}
 				bv := &BlockVisitor{newScope, fv, entry}
@@ -213,9 +198,11 @@ func (s *BlockVisitor) AddDecl(d ast.Decl) error {
 			} else {
 				value = lovm.ConstInt(typ.LlvmType(), 0)
 			}
-			if err := s.AddVar(Symbol{Name: n.Name, Type: typ, Value: value}); err != nil {
+			sym := Symbol{Name: n.Name, Type: typ}
+			if err := s.AddVar(sym); err != nil {
 				util.Perrorf("cannot add var %s: %s", n.Name, err)
 			}
+			s.Block.Assign(sym, value)
 		}
 	}
 	return nil
@@ -234,10 +221,6 @@ func (s *Scope) AddVar(variable Symbol) error {
 	name := variable.Name
 	if _, ok := s.Symbols[name]; ok {
 		return fmt.Errorf("Multiple declarations of %s", name)
-	}
-	if variable.Value == nil {
-		value := lovm.ConstInt(variable.Type.LlvmType(), 0)
-		variable.Value = &value
 	}
 	s.Symbols[name] = variable
 	return nil
@@ -337,7 +320,7 @@ func (v *ExpressionVisitor) Visit(node ast.Node) ast.Visitor {
 			} else {
 				symbol := v.ResolveSymbol(n.Name)
 				v.Type = symbol.Type
-				v.Value = symbol.Value
+				v.Value = v.Builder.Ref(v.Type.LlvmType(), symbol)
 			}
 			return nil
 		case *ast.CallExpr:
@@ -448,8 +431,7 @@ func (v *BlockVisitor) Visit(node ast.Node) ast.Visitor {
 					values[i] = ev.Value
 				}
 				for i, sym := range symbols {
-					sym.Value = values[i]
-					v.Block.Assign(sym, sym.Value)
+					v.Block.Assign(sym, values[i])
 				}
 			}
 		case *ast.IfStmt:
@@ -511,7 +493,9 @@ func CompileFile(fset *token.FileSet, tree *ast.File) error {
 	}
 
 	ctx := lovm.NewContext(f)
-	v := &ModuleVisitor{NewFileSetScope(fset, nil), ctx.NewModule(tree.Name.Name), ""}
+	v := &ModuleVisitor{NewFileSetScope(fset, &Scope{Symbols: make(SymbolMap)}), ctx.NewModule(tree.Name.Name), "", 0}
+	// TODO(mkm) cleanup this mess
+	v.Scope.VarSequence = &v.VarSequence
 	Walk(v, tree)
 
 	ctx.Emit()

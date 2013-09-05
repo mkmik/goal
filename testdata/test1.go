@@ -12,10 +12,13 @@ func TestY() (int8, int16) {
 }
 */
 
+
 func TestCmp(a, b int64) bool {
-	return a > b
+	return (a + 1) > (b - a)
 }
 
+
+/*
 func TestBranch(a, b int64) int64 {
 	var x int64 = a
 	if a > b {
@@ -23,6 +26,7 @@ func TestBranch(a, b int64) int64 {
 	}
 	return x
 }
+*/
 
 /*
 func Test(a, b int64, c int32) int64 {
@@ -57,9 +61,11 @@ func TestNested(a int64) int64 {
 }
 */
 
+/*
 func Printf(a string) int64 {
 	return 0
 }
+*/
 
 /*
 func main() int64 {

@@ -101,7 +101,8 @@ type Const struct {
 
 type RefOp struct {
 	Valuable
-	Sym Register
+	Sym   Register
+	Alias string
 }
 
 type PhiParam struct {
@@ -180,16 +181,29 @@ func (b RefOp) Emit(fun *Function) {
 	// no instructions emitted for refop
 }
 
-func (r *RefOp) Prepare(fun *Function, b *Block) {
-	r.Valuable.Prepare(fun, b)
+func (r *RefOp) Name() string {
+	if r.Alias != "" {
+		return r.Alias
+	}
+	return r.Valuable.Name()
+}
 
+func (r *RefOp) Prepare(fun *Function, b *Block) {
 	phis := []PhiParam{}
 	for _, p := range b.Preds {
 		if v, ok := p.ResolveVar(r.Sym); ok {
 			phis = append(phis, PhiParam{v.Name(), p.Name()})
 		}
 	}
-	b.Phis = append(b.Phis, &PhiOp{*r, phis})
+
+	if len(phis) > 0 {
+		r.Valuable.Prepare(fun, b)
+		b.Phis = append(b.Phis, &PhiOp{*r, phis})
+	} else {
+		if v, ok := b.ResolveVar(r.Sym); ok {
+			r.Alias = v.Name()
+		}
+	}
 }
 
 func (b PhiOp) Emit(fun *Function) {

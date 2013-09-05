@@ -42,7 +42,7 @@ func (b *Builder) IICmp(op string, op1, op2 Value) Value {
 
 func (b *Builder) Ref(typ Type, sym Register) Value {
 	util.AssertNotNil(typ)
-	return b.Add(&RefOp{Valuable{Typ: typ}, sym})
+	return b.Add(&RefOp{Valuable{Typ: typ}, sym, ""})
 }
 
 func (b *Builder) Call(typ Type, fun string, args ...Value) Value {
