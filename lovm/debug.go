@@ -2,7 +2,21 @@ package lovm
 
 import (
 	"fmt"
+	"strings"
 )
+
+func assertNotNil(args ...interface{}) {
+	var failedArgs []string
+	for i, a := range args {
+		if a == nil {
+			failedArgs = append(failedArgs, fmt.Sprintf("%d", i))
+		}
+	}
+	if failedArgs != nil {
+		panic(fmt.Errorf("runtime error: Nil assertion failed. Failed args: %s",
+			strings.Join(failedArgs, ", ")))
+	}
+}
 
 type DebugInstr struct {
 	Source string
